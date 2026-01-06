@@ -27,24 +27,24 @@ This allows true crossovers by letting each game define its own packet vocabular
 
 All Neon packets follow this structure:
 
-```rust
-struct NeonPacket {
-    header: PacketHeader,
-    payload: Vec<u8>,  // Raw bytes - game interprets
-}
+```java
+record NeonPacket(
+    PacketHeader header,
+    PacketPayload payload  // Raw bytes - game interprets
+) {}
 ```
 
 ### PacketHeader
 
-```rust
-struct PacketHeader {
-    magic: u16,          // 0x4E45 = "NE"
-    version: u8,         // Protocol version (core only)
-    packet_type: u8,     // See packet types below
-    sequence: u16,       // For ordering/reliability
-    client_id: u8,       // Sender
-    destination_id: u8,  // Target (0 = broadcast, 1 = host, 2+ = clients)
-}
+```java
+record PacketHeader(
+    short magic,         // 0x4E45 = "NE"
+    byte version,        // Protocol version (core only)
+    byte packetType,     // See packet types below
+    short sequence,      // For ordering/reliability
+    byte clientId,       // Sender
+    byte destinationId   // Target (0 = broadcast, 1 = host, 2+ = clients)
+) {}
 ```
 
 ---
@@ -53,20 +53,21 @@ struct PacketHeader {
 
 **Only these packet types are part of the core protocol:**
 
-```rust
-enum CorePacketType {
+```java
+enum PacketType {
     // Connection Management (0x01-0x0F reserved)
-    0x01 = ConnectRequest,
-    0x02 = ConnectAccept,
-    0x03 = ConnectDeny,
-    0x04 = SessionConfig,
-    0x05 = PacketTypeRegistry,
-    0x0B = Ping,
-    0x0C = Pong,
-    0x0D = DisconnectNotice,
-    
+    CONNECT_REQUEST((byte) 0x01),
+    CONNECT_ACCEPT((byte) 0x02),
+    CONNECT_DENY((byte) 0x03),
+    SESSION_CONFIG((byte) 0x04),
+    PACKET_TYPE_REGISTRY((byte) 0x05),
+    PING((byte) 0x0B),
+    PONG((byte) 0x0C),
+    DISCONNECT_NOTICE((byte) 0x0D),
+    ACK((byte) 0x0E),
+
     // Game-Defined Range (0x10-0xFF)
-    0x10+ = GamePacket,  // Everything else is application-defined
+    GAME_PACKET((byte) 0x10)  // Everything else is application-defined
 }
 ```
 
@@ -76,68 +77,68 @@ enum CorePacketType {
 
 ### ConnectRequest
 
-```rust
-struct ConnectRequest {
-    client_version: u8,      // Client's protocol version
-    desired_name: String,    // Display name
-    target_session_id: u32,  // Which session to join
-    game_identifier: u32,    // Game hash/ID (optional validation)
-}
+```java
+record ConnectRequest(
+    byte clientVersion,      // Client's protocol version
+    String desiredName,      // Display name
+    int targetSessionId,     // Which session to join
+    int gameIdentifier       // Game hash/ID (optional validation)
+) implements PacketPayload {}
 ```
 
 ### ConnectAccept
 
-```rust
-struct ConnectAccept {
-    assigned_client_id: u8,
-    session_id: u32,
-}
+```java
+record ConnectAccept(
+    byte assignedClientId,
+    int sessionId
+) implements PacketPayload {}
 ```
 
 ### ConnectDeny
 
-```rust
-struct ConnectDeny {
-    reason: String,
-}
+```java
+record ConnectDeny(
+    String reason
+) implements PacketPayload {}
 ```
 
 ### SessionConfig
 
-```rust
-struct SessionConfig {
-    version: u8,              // Session protocol version
-    tick_rate: u16,           // Server tick rate (informational)
-    max_packet_size: u16,     // MTU hint
-}
+```java
+record SessionConfig(
+    byte version,            // Session protocol version
+    short tickRate,          // Server tick rate (informational)
+    short maxPacketSize      // MTU hint
+) implements PacketPayload {}
 ```
 
 ### PacketTypeRegistry
 
 Allows host to share packet type definitions with clients (optional, for debugging/tooling):
 
-```rust
-struct PacketTypeRegistry {
-    entries: Vec<PacketTypeEntry>,
-}
+```java
+record PacketTypeRegistry(
+    List<PacketTypeEntry> entries
+) implements PacketPayload {}
 
-struct PacketTypeEntry {
-    packet_id: u8,           // e.g., 0x10
-    name: String,            // e.g., "PlayerMovement"
-    description: String,     // Optional schema info
-}
+record PacketTypeEntry(
+    byte packetId,           // e.g., 0x10
+    String name,             // e.g., "PlayerMovement"
+    String description       // Optional schema info
+) {}
 ```
 
 ### Ping/Pong
 
-```rust
-struct Ping {
-    timestamp: u64,
-}
+```java
+record Ping(
+    long timestamp
+) implements PacketPayload {}
 
-struct Pong {
-    original_timestamp: u64,
-}
+record Pong(
+    long originalTimestamp
+) implements PacketPayload {}
 ```
 
 ---
@@ -152,24 +153,28 @@ struct Pong {
 
 Games are free to structure their payloads however they want:
 
-```rust
+```java
 // Example: A movement packet
-struct GameMovementPacket {
-    actor_id: u32,
-    position: [f32; 3],
-    rotation: [f32; 4],
-    velocity: [f32; 3],
+record GameMovementPacket(
+    int actorId,
+    float[] position,  // [x, y, z]
+    float[] rotation,  // [x, y, z, w]
+    float[] velocity   // [vx, vy, vz]
     // ... whatever the game needs
+) {
+    byte[] serialize() {
+        // Your serialization logic
+    }
 }
 
 // Sent as:
-NeonPacket {
-    header: PacketHeader {
-        packet_type: 0x10,  // Registered as "Movement"
-        ...
-    },
-    payload: serialize(GameMovementPacket { ... }),
-}
+NeonPacket packet = NeonPacket.create(
+    PacketType.GAME_PACKET,
+    sequenceNumber,
+    clientId,
+    destinationId,
+    new PacketPayload.GamePacket(movement.serialize())
+);
 ```
 
 ---
@@ -231,11 +236,13 @@ Since there are no feature flags, games identify compatibility through:
 
 ### Example Code Structure
 
-```rust
+```java
 // Game-specific packet handler
-match packet.header.packet_type {
-    0x01..=0x0F => core_handler.handle(packet),
-    0x10..=0xFF => game_handler.handle(packet),
+PacketType type = PacketType.fromByte(packet.header().packetType());
+if (type.isCorePacket()) {
+    coreHandler.handle(packet);
+} else {
+    gameHandler.handle(packet);
 }
 ```
 
@@ -245,42 +252,140 @@ match packet.header.packet_type {
 
 ### Building from Source
 
+Project Neon is now implemented in **Java 21** with full Maven support.
+
 ```bash
 # Clone the repository
-git clone https://github.com/KohanMathers/ProjectNeon
+git clone https://github.com/QuietTerminal/ProjectNeon
 cd ProjectNeon
 
-# Build release binaries
-cargo build --release
+# Build with Maven
+mvn clean package
 
-# Binaries will be in target/release/
-# - relay (standalone relay server)
-# - client (example client)
-# - host (example host)
-# - libproject_neon.so (C FFI library)
+# Standalone executable JARs will be created in target/:
+# - neon-relay.jar (relay server)
+# - neon-host.jar (example host)
+# - neon-client.jar (example client)
+# - project-neon-0.2.0.jar (library for integration)
 ```
 
-### Using Precompiled Binaries
+### Running the Components
 
-#### Running the Relay Server
+#### Relay Server
 
 ```bash
-# Start relay on default port (7777)
-./relay
+# Run relay on default port (7777)
+java -jar target/neon-relay.jar
 
-# Or specify a custom address
-./relay --bind 0.0.0.0:8888
+# Or specify a custom bind address
+java -jar target/neon-relay.jar --bind 0.0.0.0:8888
+
+# Or use Maven exec plugin
+mvn exec:java@relay
 ```
 
-#### C/C++ Integration
+#### Host
+
+```bash
+# Run host with auto-generated session ID
+java -jar target/neon-host.jar
+
+# Or specify a session ID
+java -jar target/neon-host.jar 12345
+
+# Or use Maven exec plugin
+mvn exec:java@host
+```
+
+#### Client
+
+```bash
+# Run interactive client
+java -jar target/neon-client.jar
+
+# Or use Maven exec plugin
+mvn exec:java@client
+```
+
+### Java Integration
+
+Add Project Neon to your Java project:
+
+**Maven:**
+```xml
+<dependency>
+    <groupId>com.quietterminal</groupId>
+    <artifactId>project-neon</artifactId>
+    <version>0.2.0</version>
+</dependency>
+```
+
+**Gradle:**
+```gradle
+implementation 'com.quietterminal:project-neon:0.2.0'
+```
+
+**Example Usage:**
+
+```java
+import com.quietterminal.projectneon.client.NeonClient;
+import com.quietterminal.projectneon.host.NeonHost;
+
+// Create and connect a client
+try (NeonClient client = new NeonClient("PlayerName")) {
+    client.setPongCallback((responseTime, timestamp) ->
+        System.out.println("Pong! Response time: " + responseTime + "ms")
+    );
+
+    if (client.connect(12345, "127.0.0.1:7777")) {
+        System.out.println("Connected! ID: " + client.getClientId().orElse((byte) 0));
+
+        // Game loop
+        while (gameRunning) {
+            client.processPackets();
+            // Your game logic here
+        }
+    }
+}
+
+// Create a host
+try (NeonHost host = new NeonHost(12345, "127.0.0.1:7777")) {
+    host.setClientConnectCallback((clientId, name, sessionId) ->
+        System.out.println("Client connected: " + name)
+    );
+
+    // Start host (blocking)
+    host.start();
+}
+```
+
+### C/C++ Integration via JNI
 
 For integrating with C/C++ applications (Unreal Engine, Unity, custom engines):
 
 **Required Files:**
-- `libproject_neon.so` (Linux) / `project_neon.dll` (Windows) / `libproject_neon.dylib` (macOS)
-- `project_neon.h`
+- `libneon_jni.so` (Linux) / `neon_jni.dll` (Windows) / `libneon_jni.dylib` (macOS)
+- `project_neon.h` (located in `src/main/native/`)
+- `project-neon-0.2.0.jar`
 
-**Basic Usage:**
+**Building JNI Library:**
+
+```bash
+# Generate JNI headers
+cd src/main/java
+javac -h ../native com/quietterminal/projectneon/jni/*.java
+
+# Compile native library (Linux)
+cd ../native
+gcc -shared -fPIC -I${JAVA_HOME}/include -I${JAVA_HOME}/include/linux \
+    -o libneon_jni.so neon_jni.c
+
+# Install library
+sudo cp libneon_jni.so /usr/local/lib/
+sudo ldconfig
+```
+
+**Basic C Usage:**
 
 ```c
 #include "project_neon.h"
@@ -301,68 +406,37 @@ while (game_running) {
 neon_client_free(client);
 ```
 
-**Host Example:**
-
-```c
-// Create host (blocking call - run in thread!)
-NeonHostHandle* host = neon_host_new(12345, "127.0.0.1:7777");
-
-// Start host in separate thread
-pthread_create(&thread, NULL, host_thread, host);
-
-// Check connected clients
-size_t count = neon_host_get_client_count(host);
-```
-
-#### Linking in Your Build System
+**Linking in Your Build System:**
 
 **CMake:**
 ```cmake
 target_include_directories(YourProject PRIVATE ${NEON_INCLUDE_DIR})
-target_link_libraries(YourProject ${NEON_LIB_DIR}/libproject_neon.so)
+target_link_libraries(YourProject neon_jni)
 ```
 
 **Unreal Engine (.Build.cs):**
 ```csharp
 PublicIncludePaths.Add(Path.Combine(ModuleDirectory, "ThirdParty/Neon/include"));
-PublicAdditionalLibraries.Add(Path.Combine(ModuleDirectory, "ThirdParty/Neon/lib/project_neon.dll"));
+PublicAdditionalLibraries.Add(Path.Combine(ModuleDirectory, "ThirdParty/Neon/lib/libneon_jni.so"));
 ```
 
 **Manual GCC:**
 ```bash
-gcc -o mygame main.c -I./include -L./lib -lproject_neon -lpthread -Wl,-rpath,./lib
-```
-
-### Rust Integration
-
-```toml
-[dependencies]
-project_neon = { path = "../projectneon" }
-```
-
-```rust
-use project_neon::{NeonClient, NeonHost, NeonRelay};
-
-let mut client = NeonClient::new("PlayerName".to_string())?;
-client.connect(12345, "127.0.0.1:7777")?;
-
-loop {
-    client.process_packets()?;
-    // Your game logic
-}
+gcc -o mygame main.c -I./include -L./lib -lneon_jni -lpthread
 ```
 
 ### Testing Your Setup
 
 ```bash
-# Terminal 1: Start relay
-./relay
+# Build the project
+mvn clean package
 
-# Terminal 2: Run test client
-./test_neon
+# Run the integration test
+mvn test-compile
+java -cp target/classes:target/test-classes NeonTest
 ```
 
-The test program will create a host and two clients, demonstrating the full connection flow.
+The test program will create a relay, host, and two clients, demonstrating the full connection flow.
 
 ---
 

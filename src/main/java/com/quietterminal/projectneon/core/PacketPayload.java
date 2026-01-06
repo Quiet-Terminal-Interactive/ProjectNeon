@@ -1,0 +1,252 @@
+package com.quietterminal.projectneon.core;
+
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * Base interface for all packet payloads.
+ */
+public sealed interface PacketPayload permits
+    PacketPayload.ConnectRequest,
+    PacketPayload.ConnectAccept,
+    PacketPayload.ConnectDeny,
+    PacketPayload.SessionConfig,
+    PacketPayload.PacketTypeRegistry,
+    PacketPayload.Ping,
+    PacketPayload.Pong,
+    PacketPayload.DisconnectNotice,
+    PacketPayload.Ack,
+    PacketPayload.GamePacket {
+
+    byte[] toBytes();
+
+    record ConnectRequest(byte clientVersion, String desiredName, int targetSessionId, int gameIdentifier)
+        implements PacketPayload {
+
+        @Override
+        public byte[] toBytes() {
+            byte[] nameBytes = desiredName.getBytes(StandardCharsets.UTF_8);
+            ByteBuffer buffer = ByteBuffer.allocate(1 + 4 + nameBytes.length + 4 + 4);
+            buffer.order(ByteOrder.LITTLE_ENDIAN);
+            buffer.put(clientVersion);
+            buffer.putInt(nameBytes.length);
+            buffer.put(nameBytes);
+            buffer.putInt(targetSessionId);
+            buffer.putInt(gameIdentifier);
+            return buffer.array();
+        }
+
+        public static ConnectRequest fromBytes(byte[] bytes) {
+            ByteBuffer buffer = ByteBuffer.wrap(bytes);
+            buffer.order(ByteOrder.LITTLE_ENDIAN);
+            byte version = buffer.get();
+            int nameLen = buffer.getInt();
+            byte[] nameBytes = new byte[nameLen];
+            buffer.get(nameBytes);
+            String name = new String(nameBytes, StandardCharsets.UTF_8);
+            int sessionId = buffer.getInt();
+            int gameId = buffer.getInt();
+            return new ConnectRequest(version, name, sessionId, gameId);
+        }
+    }
+
+    record ConnectAccept(byte assignedClientId, int sessionId) implements PacketPayload {
+        @Override
+        public byte[] toBytes() {
+            ByteBuffer buffer = ByteBuffer.allocate(1 + 4);
+            buffer.order(ByteOrder.LITTLE_ENDIAN);
+            buffer.put(assignedClientId);
+            buffer.putInt(sessionId);
+            return buffer.array();
+        }
+
+        public static ConnectAccept fromBytes(byte[] bytes) {
+            ByteBuffer buffer = ByteBuffer.wrap(bytes);
+            buffer.order(ByteOrder.LITTLE_ENDIAN);
+            byte clientId = buffer.get();
+            int sessionId = buffer.getInt();
+            return new ConnectAccept(clientId, sessionId);
+        }
+    }
+
+    record ConnectDeny(String reason) implements PacketPayload {
+        @Override
+        public byte[] toBytes() {
+            byte[] reasonBytes = reason.getBytes(StandardCharsets.UTF_8);
+            ByteBuffer buffer = ByteBuffer.allocate(4 + reasonBytes.length);
+            buffer.order(ByteOrder.LITTLE_ENDIAN);
+            buffer.putInt(reasonBytes.length);
+            buffer.put(reasonBytes);
+            return buffer.array();
+        }
+
+        public static ConnectDeny fromBytes(byte[] bytes) {
+            ByteBuffer buffer = ByteBuffer.wrap(bytes);
+            buffer.order(ByteOrder.LITTLE_ENDIAN);
+            int len = buffer.getInt();
+            byte[] reasonBytes = new byte[len];
+            buffer.get(reasonBytes);
+            String reason = new String(reasonBytes, StandardCharsets.UTF_8);
+            return new ConnectDeny(reason);
+        }
+    }
+
+    record SessionConfig(byte version, short tickRate, short maxPacketSize) implements PacketPayload {
+        @Override
+        public byte[] toBytes() {
+            ByteBuffer buffer = ByteBuffer.allocate(1 + 2 + 2);
+            buffer.order(ByteOrder.LITTLE_ENDIAN);
+            buffer.put(version);
+            buffer.putShort(tickRate);
+            buffer.putShort(maxPacketSize);
+            return buffer.array();
+        }
+
+        public static SessionConfig fromBytes(byte[] bytes) {
+            ByteBuffer buffer = ByteBuffer.wrap(bytes);
+            buffer.order(ByteOrder.LITTLE_ENDIAN);
+            byte version = buffer.get();
+            short tickRate = buffer.getShort();
+            short maxPacketSize = buffer.getShort();
+            return new SessionConfig(version, tickRate, maxPacketSize);
+        }
+    }
+
+    record PacketTypeEntry(byte packetId, String name, String description) {
+        public byte[] toBytes() {
+            byte[] nameBytes = name.getBytes(StandardCharsets.UTF_8);
+            byte[] descBytes = description.getBytes(StandardCharsets.UTF_8);
+            ByteBuffer buffer = ByteBuffer.allocate(1 + 1 + nameBytes.length + 1 + descBytes.length);
+            buffer.order(ByteOrder.LITTLE_ENDIAN);
+            buffer.put(packetId);
+            buffer.put((byte) nameBytes.length);
+            buffer.put(nameBytes);
+            buffer.put((byte) descBytes.length);
+            buffer.put(descBytes);
+            return buffer.array();
+        }
+    }
+
+    record PacketTypeRegistry(List<PacketTypeEntry> entries) implements PacketPayload {
+        @Override
+        public byte[] toBytes() {
+            List<byte[]> entryBytes = new ArrayList<>();
+            int totalSize = 4; // for entry count
+            for (PacketTypeEntry entry : entries) {
+                byte[] eb = entry.toBytes();
+                entryBytes.add(eb);
+                totalSize += eb.length;
+            }
+            ByteBuffer buffer = ByteBuffer.allocate(totalSize);
+            buffer.order(ByteOrder.LITTLE_ENDIAN);
+            buffer.putInt(entries.size());
+            for (byte[] eb : entryBytes) {
+                buffer.put(eb);
+            }
+            return buffer.array();
+        }
+
+        public static PacketTypeRegistry fromBytes(byte[] bytes) {
+            ByteBuffer buffer = ByteBuffer.wrap(bytes);
+            buffer.order(ByteOrder.LITTLE_ENDIAN);
+            int count = buffer.getInt();
+            List<PacketTypeEntry> entries = new ArrayList<>(count);
+            for (int i = 0; i < count; i++) {
+                byte packetId = buffer.get();
+                int nameLen = buffer.get() & 0xFF;
+                byte[] nameBytes = new byte[nameLen];
+                buffer.get(nameBytes);
+                String name = new String(nameBytes, StandardCharsets.UTF_8);
+                int descLen = buffer.get() & 0xFF;
+                byte[] descBytes = new byte[descLen];
+                buffer.get(descBytes);
+                String desc = new String(descBytes, StandardCharsets.UTF_8);
+                entries.add(new PacketTypeEntry(packetId, name, desc));
+            }
+            return new PacketTypeRegistry(entries);
+        }
+    }
+
+    record Ping(long timestamp) implements PacketPayload {
+        @Override
+        public byte[] toBytes() {
+            ByteBuffer buffer = ByteBuffer.allocate(8);
+            buffer.order(ByteOrder.LITTLE_ENDIAN);
+            buffer.putLong(timestamp);
+            return buffer.array();
+        }
+
+        public static Ping fromBytes(byte[] bytes) {
+            ByteBuffer buffer = ByteBuffer.wrap(bytes);
+            buffer.order(ByteOrder.LITTLE_ENDIAN);
+            long timestamp = buffer.getLong();
+            return new Ping(timestamp);
+        }
+    }
+
+    record Pong(long originalTimestamp) implements PacketPayload {
+        @Override
+        public byte[] toBytes() {
+            ByteBuffer buffer = ByteBuffer.allocate(8);
+            buffer.order(ByteOrder.LITTLE_ENDIAN);
+            buffer.putLong(originalTimestamp);
+            return buffer.array();
+        }
+
+        public static Pong fromBytes(byte[] bytes) {
+            ByteBuffer buffer = ByteBuffer.wrap(bytes);
+            buffer.order(ByteOrder.LITTLE_ENDIAN);
+            long timestamp = buffer.getLong();
+            return new Pong(timestamp);
+        }
+    }
+
+    record DisconnectNotice() implements PacketPayload {
+        @Override
+        public byte[] toBytes() {
+            return new byte[0];
+        }
+
+        public static DisconnectNotice fromBytes(byte[] bytes) {
+            return new DisconnectNotice();
+        }
+    }
+
+    record Ack(List<Short> acknowledgedSequences) implements PacketPayload {
+        @Override
+        public byte[] toBytes() {
+            ByteBuffer buffer = ByteBuffer.allocate(4 + acknowledgedSequences.size() * 2);
+            buffer.order(ByteOrder.LITTLE_ENDIAN);
+            buffer.putInt(acknowledgedSequences.size());
+            for (Short seq : acknowledgedSequences) {
+                buffer.putShort(seq);
+            }
+            return buffer.array();
+        }
+
+        public static Ack fromBytes(byte[] bytes) {
+            ByteBuffer buffer = ByteBuffer.wrap(bytes);
+            buffer.order(ByteOrder.LITTLE_ENDIAN);
+            int count = buffer.getInt();
+            List<Short> sequences = new ArrayList<>(count);
+            for (int i = 0; i < count; i++) {
+                sequences.add(buffer.getShort());
+            }
+            return new Ack(sequences);
+        }
+    }
+
+    record GamePacket(byte[] payload) implements PacketPayload {
+        @Override
+        public byte[] toBytes() {
+            return payload;
+        }
+
+        public static GamePacket fromBytes(byte[] bytes) {
+            return new GamePacket(bytes);
+        }
+    }
+}
