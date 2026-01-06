@@ -440,6 +440,130 @@ The test program will create a relay, host, and two clients, demonstrating the f
 
 ---
 
+## Security Considerations
+
+**IMPORTANT: Project Neon is designed for trusted local networks or controlled environments. Read this section carefully before deploying.**
+
+### No Encryption
+
+Project Neon uses **plaintext UDP** - all packets are transmitted unencrypted. This means:
+
+- Any network observer can read packet contents
+- Packet contents can be modified in transit
+- Sensitive data (passwords, personal info) will be exposed
+
+**Recommendations:**
+- Deploy on isolated/trusted networks only
+- Use VPN or SSH tunnels for internet deployment
+- Never transmit sensitive data without application-layer encryption
+- Consider implementing TLS/DTLS at the application layer if needed
+
+### No Built-in Authentication
+
+Project Neon has **no authentication mechanism**:
+
+- Anyone can connect to any session if they know the session ID
+- Session IDs are just integers - easily guessable
+- No password protection for sessions
+- No verification of client identity
+
+**Recommendations:**
+- Implement authentication at the application layer
+- Use the `gameIdentifier` field in `ConnectRequest` as a shared secret/token
+- Add password validation in your host's connection callback
+- Use external authentication services (OAuth, etc.) before allowing connection
+- Consider session tokens or invite codes for matchmaking
+
+### Denial of Service Protection
+
+Project Neon includes basic DoS protections (as of v0.2.0):
+
+- Per-client rate limiting (configurable packets per second)
+- Maximum connections per session
+- Maximum total connections to relay
+- Packet flood detection and throttling
+- Memory usage limits for packet queues
+
+**However, sophisticated attacks may still succeed:**
+- UDP amplification attacks
+- Resource exhaustion through many sessions
+- Malformed packet fuzzing
+
+**Recommendations:**
+- Run relay behind a firewall with rate limiting
+- Use fail2ban or similar tools to block abusive IPs
+- Monitor relay resource usage
+- Implement application-layer abuse detection
+
+### Input Validation
+
+Project Neon validates core protocol inputs (as of v0.2.0):
+
+- Buffer overflow protection on all packet types
+- String length limits (names, descriptions)
+- Packet count limits
+- Session ID validation
+
+**Your application must validate game packets:**
+- All game-defined packets (0x10+) are forwarded raw
+- The relay does not inspect or validate game packet payloads
+- Malicious clients can send arbitrary data
+
+**Recommendations:**
+- Validate all game packet fields before processing
+- Use bounds checking on array indices and sizes
+- Sanitize user-provided strings
+- Implement server-side authority for game state
+
+### UDP Unreliability
+
+UDP provides **no delivery guarantees**:
+
+- Packets may be lost, duplicated, or arrive out-of-order
+- No built-in congestion control
+- NAT/firewall traversal issues
+
+**Recommendations:**
+- Implement reliability for critical game events (optional ACK layer)
+- Design game logic to tolerate packet loss
+- Use sequence numbers for ordering (provided in header)
+- Consider STUN/TURN for NAT traversal in internet deployment
+- Test on realistic network conditions (packet loss, latency)
+
+### Game Developer Responsibilities
+
+**As a game developer using Project Neon, you MUST:**
+
+1. Implement authentication if your game requires it
+2. Encrypt sensitive data at the application layer
+3. Validate all incoming game packets (0x10+)
+4. Implement server-side authority for game state
+5. Rate-limit game actions to prevent abuse
+6. Design for UDP unreliability (packet loss tolerance)
+7. Never trust client-provided data without validation
+
+### Deployment Recommendations
+
+**For Local/LAN Gaming:**
+- Project Neon is ideal for trusted local networks
+- Minimal security overhead for low-latency gameplay
+
+**For Internet Deployment:**
+- Run relay behind firewall/VPN
+- Implement application-layer authentication
+- Encrypt sensitive data before sending
+- Use monitoring and logging
+- Consider DDoS protection services
+- Read [SECURITY.md](SECURITY.md) for detailed threat model
+
+### Security Disclosure
+
+If you discover a security vulnerability in Project Neon's core protocol, please report it via email to kohanmathersmcgonnell@gmail.com
+
+See [SECURITY.md](SECURITY.md) for detailed threat model, attack scenarios, and mitigations.
+
+---
+
 ## Future Possibilities
 
 - **Universal Game Protocol Library**: Common packet types (movement, chat, etc.)
