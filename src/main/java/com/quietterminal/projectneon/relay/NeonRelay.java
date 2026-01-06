@@ -18,6 +18,7 @@ public class NeonRelay implements AutoCloseable {
     private static final long CLIENT_TIMEOUT_MS = 15000;
     private static final int MAX_PACKETS_PER_SECOND = 100;
     private static final int MAX_CLIENTS_PER_SESSION = 32;
+    private static final int MAX_TOTAL_CONNECTIONS = 1000;
 
     private final NeonSocket socket;
     private final SessionManager sessionManager;
@@ -98,6 +99,19 @@ public class NeonRelay implements AutoCloseable {
 
     private void handleConnectRequest(PacketPayload.ConnectRequest request, SocketAddress source) throws IOException {
         int sessionId = request.targetSessionId();
+
+        // Check if relay has reached maximum total connections
+        int totalConnections = sessionManager.getTotalConnections();
+        if (totalConnections >= MAX_TOTAL_CONNECTIONS) {
+            PacketPayload.ConnectDeny deny = new PacketPayload.ConnectDeny("Relay is full");
+            PacketHeader header = PacketHeader.create(
+                PacketType.CONNECT_DENY.getValue(), (short) 0, (byte) 0, (byte) 0
+            );
+            NeonPacket denyPacket = new NeonPacket(header, deny);
+            socket.sendPacket(denyPacket, source);
+            System.err.println("Connection denied for " + source + ": relay is full (" + totalConnections + "/" + MAX_TOTAL_CONNECTIONS + ")");
+            return;
+        }
 
         // Check if session has reached maximum client capacity
         int currentClients = sessionManager.getClientCount(sessionId);
@@ -266,6 +280,10 @@ class SessionManager {
     public int getClientCount(int sessionId) {
         List<PeerInfo> peers = sessions.get(sessionId);
         return peers != null ? peers.size() : 0;
+    }
+
+    public int getTotalConnections() {
+        return peerLookup.size();
     }
 
     public Optional<Integer> getSessionForPeer(SocketAddress addr) {
