@@ -47,14 +47,26 @@ public sealed interface PacketPayload permits
         public static ConnectRequest fromBytes(byte[] bytes) {
             ByteBuffer buffer = ByteBuffer.wrap(bytes);
             buffer.order(ByteOrder.LITTLE_ENDIAN);
+            if (buffer.remaining() < 1) {
+                throw new IllegalArgumentException("Buffer underflow: not enough bytes for version");
+            }
             byte version = buffer.get();
+            if (buffer.remaining() < 4) {
+                throw new IllegalArgumentException("Buffer underflow: not enough bytes for name length");
+            }
             int nameLen = buffer.getInt();
             if (nameLen < 0 || nameLen > MAX_NAME_LENGTH) {
                 throw new IllegalArgumentException("Name length " + nameLen + " exceeds maximum of " + MAX_NAME_LENGTH);
             }
+            if (buffer.remaining() < nameLen) {
+                throw new IllegalArgumentException("Buffer underflow: not enough bytes for name");
+            }
             byte[] nameBytes = new byte[nameLen];
             buffer.get(nameBytes);
             String name = new String(nameBytes, StandardCharsets.UTF_8);
+            if (buffer.remaining() < 8) {
+                throw new IllegalArgumentException("Buffer underflow: not enough bytes for session and game IDs");
+            }
             int sessionId = buffer.getInt();
             int gameId = buffer.getInt();
             return new ConnectRequest(version, name, sessionId, gameId);
@@ -74,6 +86,9 @@ public sealed interface PacketPayload permits
         public static ConnectAccept fromBytes(byte[] bytes) {
             ByteBuffer buffer = ByteBuffer.wrap(bytes);
             buffer.order(ByteOrder.LITTLE_ENDIAN);
+            if (buffer.remaining() < 5) {
+                throw new IllegalArgumentException("Buffer underflow: not enough bytes for ConnectAccept (expected 5 bytes)");
+            }
             byte clientId = buffer.get();
             int sessionId = buffer.getInt();
             return new ConnectAccept(clientId, sessionId);
@@ -94,7 +109,16 @@ public sealed interface PacketPayload permits
         public static ConnectDeny fromBytes(byte[] bytes) {
             ByteBuffer buffer = ByteBuffer.wrap(bytes);
             buffer.order(ByteOrder.LITTLE_ENDIAN);
+            if (buffer.remaining() < 4) {
+                throw new IllegalArgumentException("Buffer underflow: not enough bytes for reason length");
+            }
             int len = buffer.getInt();
+            if (len < 0 || len > MAX_DESCRIPTION_LENGTH) {
+                throw new IllegalArgumentException("Reason length " + len + " exceeds maximum of " + MAX_DESCRIPTION_LENGTH);
+            }
+            if (buffer.remaining() < len) {
+                throw new IllegalArgumentException("Buffer underflow: not enough bytes for reason");
+            }
             byte[] reasonBytes = new byte[len];
             buffer.get(reasonBytes);
             String reason = new String(reasonBytes, StandardCharsets.UTF_8);
@@ -116,6 +140,9 @@ public sealed interface PacketPayload permits
         public static SessionConfig fromBytes(byte[] bytes) {
             ByteBuffer buffer = ByteBuffer.wrap(bytes);
             buffer.order(ByteOrder.LITTLE_ENDIAN);
+            if (buffer.remaining() < 5) {
+                throw new IllegalArgumentException("Buffer underflow: not enough bytes for SessionConfig (expected 5 bytes)");
+            }
             byte version = buffer.get();
             short tickRate = buffer.getShort();
             short maxPacketSize = buffer.getShort();
@@ -160,23 +187,41 @@ public sealed interface PacketPayload permits
         public static PacketTypeRegistry fromBytes(byte[] bytes) {
             ByteBuffer buffer = ByteBuffer.wrap(bytes);
             buffer.order(ByteOrder.LITTLE_ENDIAN);
+            if (buffer.remaining() < 4) {
+                throw new IllegalArgumentException("Buffer underflow: not enough bytes for entry count");
+            }
             int count = buffer.getInt();
             if (count < 0 || count > MAX_PACKET_COUNT) {
                 throw new IllegalArgumentException("Packet type count " + count + " exceeds maximum of " + MAX_PACKET_COUNT);
             }
             List<PacketTypeEntry> entries = new ArrayList<>(count);
             for (int i = 0; i < count; i++) {
+                if (buffer.remaining() < 1) {
+                    throw new IllegalArgumentException("Buffer underflow: not enough bytes for packet ID");
+                }
                 byte packetId = buffer.get();
+                if (buffer.remaining() < 1) {
+                    throw new IllegalArgumentException("Buffer underflow: not enough bytes for name length");
+                }
                 int nameLen = buffer.get() & 0xFF;
                 if (nameLen > MAX_NAME_LENGTH) {
                     throw new IllegalArgumentException("Packet type name length " + nameLen + " exceeds maximum of " + MAX_NAME_LENGTH);
                 }
+                if (buffer.remaining() < nameLen) {
+                    throw new IllegalArgumentException("Buffer underflow: not enough bytes for name");
+                }
                 byte[] nameBytes = new byte[nameLen];
                 buffer.get(nameBytes);
                 String name = new String(nameBytes, StandardCharsets.UTF_8);
+                if (buffer.remaining() < 1) {
+                    throw new IllegalArgumentException("Buffer underflow: not enough bytes for description length");
+                }
                 int descLen = buffer.get() & 0xFF;
                 if (descLen > MAX_DESCRIPTION_LENGTH) {
                     throw new IllegalArgumentException("Packet type description length " + descLen + " exceeds maximum of " + MAX_DESCRIPTION_LENGTH);
+                }
+                if (buffer.remaining() < descLen) {
+                    throw new IllegalArgumentException("Buffer underflow: not enough bytes for description");
                 }
                 byte[] descBytes = new byte[descLen];
                 buffer.get(descBytes);
@@ -199,6 +244,9 @@ public sealed interface PacketPayload permits
         public static Ping fromBytes(byte[] bytes) {
             ByteBuffer buffer = ByteBuffer.wrap(bytes);
             buffer.order(ByteOrder.LITTLE_ENDIAN);
+            if (buffer.remaining() < 8) {
+                throw new IllegalArgumentException("Buffer underflow: not enough bytes for Ping (expected 8 bytes)");
+            }
             long timestamp = buffer.getLong();
             return new Ping(timestamp);
         }
@@ -216,6 +264,9 @@ public sealed interface PacketPayload permits
         public static Pong fromBytes(byte[] bytes) {
             ByteBuffer buffer = ByteBuffer.wrap(bytes);
             buffer.order(ByteOrder.LITTLE_ENDIAN);
+            if (buffer.remaining() < 8) {
+                throw new IllegalArgumentException("Buffer underflow: not enough bytes for Pong (expected 8 bytes)");
+            }
             long timestamp = buffer.getLong();
             return new Pong(timestamp);
         }
@@ -247,9 +298,15 @@ public sealed interface PacketPayload permits
         public static Ack fromBytes(byte[] bytes) {
             ByteBuffer buffer = ByteBuffer.wrap(bytes);
             buffer.order(ByteOrder.LITTLE_ENDIAN);
+            if (buffer.remaining() < 4) {
+                throw new IllegalArgumentException("Buffer underflow: not enough bytes for ACK count");
+            }
             int count = buffer.getInt();
             if (count < 0 || count > MAX_PACKET_COUNT) {
                 throw new IllegalArgumentException("ACK packet count " + count + " exceeds maximum of " + MAX_PACKET_COUNT);
+            }
+            if (buffer.remaining() < count * 2) {
+                throw new IllegalArgumentException("Buffer underflow: not enough bytes for " + count + " sequence numbers");
             }
             List<Short> sequences = new ArrayList<>(count);
             for (int i = 0; i < count; i++) {
