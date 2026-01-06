@@ -19,6 +19,8 @@ public class NeonRelay implements AutoCloseable {
     private static final int MAX_PACKETS_PER_SECOND = 100;
     private static final int MAX_CLIENTS_PER_SESSION = 32;
     private static final int MAX_TOTAL_CONNECTIONS = 1000;
+    private static final int MAX_PENDING_CONNECTIONS = 100;
+    private static final int MAX_RATE_LIMITERS = 2000;
 
     private final NeonSocket socket;
     private final SessionManager sessionManager;
@@ -72,7 +74,11 @@ public class NeonRelay implements AutoCloseable {
     }
 
     private void handlePacket(NeonPacket packet, SocketAddress source) throws IOException {
-        // Rate limiting and flood detection check
+        if (!rateLimiters.containsKey(source) && rateLimiters.size() >= MAX_RATE_LIMITERS) {
+            System.err.println("Rate limiter capacity exceeded for " + source + " - dropping packet");
+            return;
+        }
+
         RateLimiter limiter = rateLimiters.computeIfAbsent(source,
             k -> new RateLimiter(MAX_PACKETS_PER_SECOND));
 
@@ -104,7 +110,6 @@ public class NeonRelay implements AutoCloseable {
     private void handleConnectRequest(PacketPayload.ConnectRequest request, SocketAddress source) throws IOException {
         int sessionId = request.targetSessionId();
 
-        // Check if relay has reached maximum total connections
         int totalConnections = sessionManager.getTotalConnections();
         if (totalConnections >= MAX_TOTAL_CONNECTIONS) {
             PacketPayload.ConnectDeny deny = new PacketPayload.ConnectDeny("Relay is full");
@@ -117,7 +122,6 @@ public class NeonRelay implements AutoCloseable {
             return;
         }
 
-        // Check if session has reached maximum client capacity
         int currentClients = sessionManager.getClientCount(sessionId);
         if (currentClients >= MAX_CLIENTS_PER_SESSION) {
             PacketPayload.ConnectDeny deny = new PacketPayload.ConnectDeny("Session is full");
@@ -127,6 +131,17 @@ public class NeonRelay implements AutoCloseable {
             NeonPacket denyPacket = new NeonPacket(header, deny);
             socket.sendPacket(denyPacket, source);
             System.err.println("Connection denied for " + source + ": session " + sessionId + " is full (" + currentClients + "/" + MAX_CLIENTS_PER_SESSION + ")");
+            return;
+        }
+
+        if (pendingConnections.size() >= MAX_PENDING_CONNECTIONS) {
+            PacketPayload.ConnectDeny deny = new PacketPayload.ConnectDeny("Too many pending connections");
+            PacketHeader header = PacketHeader.create(
+                PacketType.CONNECT_DENY.getValue(), (short) 0, (byte) 0, (byte) 0
+            );
+            NeonPacket denyPacket = new NeonPacket(header, deny);
+            socket.sendPacket(denyPacket, source);
+            System.err.println("Connection denied for " + source + ": pending connections queue full (" + pendingConnections.size() + "/" + MAX_PENDING_CONNECTIONS + ")");
             return;
         }
 
@@ -230,6 +245,24 @@ public class NeonRelay implements AutoCloseable {
         }
 
         sessionManager.cleanupStale(CLIENT_TIMEOUT_MS);
+
+        Instant pendingCutoff = Instant.now().minusMillis(30000);
+        pendingConnections.entrySet().removeIf(entry -> {
+            if (entry.getValue().requestTime().isBefore(pendingCutoff)) {
+                System.out.println("Cleaned up stale pending connection: " + entry.getKey());
+                return true;
+            }
+            return false;
+        });
+
+        Set<SocketAddress> activeAddresses = sessionManager.getActiveAddresses();
+        rateLimiters.keySet().removeIf(addr -> {
+            if (!activeAddresses.contains(addr) && !pendingConnections.containsKey(addr)) {
+                return true;
+            }
+            return false;
+        });
+
         lastCleanupTime = now;
     }
 
@@ -288,6 +321,10 @@ class SessionManager {
 
     public int getTotalConnections() {
         return peerLookup.size();
+    }
+
+    public Set<SocketAddress> getActiveAddresses() {
+        return new HashSet<>(peerLookup.keySet());
     }
 
     public Optional<Integer> getSessionForPeer(SocketAddress addr) {
@@ -356,15 +393,14 @@ record PeerInfo(
  * Tracks violations and implements progressive throttling for repeat offenders.
  */
 class RateLimiter {
-    private static final int FLOOD_THRESHOLD = 3; // Number of violations before throttling
-    private static final long FLOOD_WINDOW_MS = 10000; // 10 second window for flood detection
-    private static final int THROTTLE_PENALTY_DIVISOR = 2; // Reduce rate by half when throttled
+    private static final int FLOOD_THRESHOLD = 3;
+    private static final long FLOOD_WINDOW_MS = 10000;
+    private static final int THROTTLE_PENALTY_DIVISOR = 2;
 
     private final int maxPacketsPerSecond;
     private int tokens;
     private long lastRefillTime;
 
-    // Flood detection state
     private int violationCount;
     private long firstViolationTime;
     private boolean isThrottled;
@@ -389,7 +425,6 @@ class RateLimiter {
             return true;
         }
 
-        // Packet denied - record violation for flood detection
         recordViolation();
         return false;
     }
@@ -409,11 +444,9 @@ class RateLimiter {
         long now = System.currentTimeMillis();
 
         if (firstViolationTime == 0 || now - firstViolationTime > FLOOD_WINDOW_MS) {
-            // Start new violation window
             firstViolationTime = now;
             violationCount = 1;
         } else {
-            // Increment violations within window
             violationCount++;
 
             if (violationCount >= FLOOD_THRESHOLD && !isThrottled) {
@@ -426,7 +459,6 @@ class RateLimiter {
     private void checkFloodStatus() {
         long now = System.currentTimeMillis();
 
-        // Clear throttle if violation window has expired
         if (isThrottled && now - firstViolationTime > FLOOD_WINDOW_MS) {
             isThrottled = false;
             violationCount = 0;

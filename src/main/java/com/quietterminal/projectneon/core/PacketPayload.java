@@ -36,9 +36,7 @@ public sealed interface PacketPayload permits
         if (input == null) {
             return "";
         }
-        // Remove control characters (0x00-0x1F and 0x7F-0x9F)
         String sanitized = input.replaceAll("[\\p{Cntrl}&&[^\r\n\t]]", "");
-        // Trim whitespace
         return sanitized.trim();
     }
 
