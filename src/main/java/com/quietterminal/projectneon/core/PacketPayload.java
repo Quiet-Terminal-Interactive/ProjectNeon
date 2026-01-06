@@ -28,6 +28,20 @@ public sealed interface PacketPayload permits
 
     byte[] toBytes();
 
+    /**
+     * Sanitizes a string by removing control characters and trimming whitespace.
+     * Control characters (0x00-0x1F and 0x7F-0x9F) can cause issues in logs and displays.
+     */
+    static String sanitizeString(String input) {
+        if (input == null) {
+            return "";
+        }
+        // Remove control characters (0x00-0x1F and 0x7F-0x9F)
+        String sanitized = input.replaceAll("[\\p{Cntrl}&&[^\r\n\t]]", "");
+        // Trim whitespace
+        return sanitized.trim();
+    }
+
     record ConnectRequest(byte clientVersion, String desiredName, int targetSessionId, int gameIdentifier)
         implements PacketPayload {
 
@@ -64,6 +78,10 @@ public sealed interface PacketPayload permits
             byte[] nameBytes = new byte[nameLen];
             buffer.get(nameBytes);
             String name = new String(nameBytes, StandardCharsets.UTF_8);
+            name = sanitizeString(name);
+            if (name.isEmpty()) {
+                throw new IllegalArgumentException("Client name cannot be empty after sanitization");
+            }
             if (buffer.remaining() < 8) {
                 throw new IllegalArgumentException("Buffer underflow: not enough bytes for session and game IDs");
             }

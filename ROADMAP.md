@@ -16,7 +16,7 @@ Project Neon has a solid foundation with excellent architecture, but requires cr
 
 ### 1. Security Hardening
 
-#### 1.1 Input Validation (HIGH PRIORITY)
+#### ~~1.1 Input Validation (HIGH PRIORITY)~~ COMPLETE
 - [x] Add security constants to core protocol:
   ```java
   public static final int MAX_NAME_LENGTH = 64;
@@ -35,7 +35,7 @@ Project Neon has a solid foundation with excellent architecture, but requires cr
   - Validate packet count
 - [x] Add ByteBuffer bounds checking before all `.get()` operations
 - [x] Validate session IDs are positive integers
-- [ ] Sanitize client names (remove control characters, enforce UTF-8)
+- [x] Sanitize client names (remove control characters, enforce UTF-8)
 
 #### 1.2 Denial of Service Protection
 - [ ] Implement per-client rate limiting in relay (max packets/second)
