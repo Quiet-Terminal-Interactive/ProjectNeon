@@ -36,6 +36,9 @@ public class NeonHost implements AutoCloseable {
     private BiConsumer<Byte, Byte> unhandledPacketCallback; // (packetType, fromClientId)
 
     public NeonHost(int sessionId, String relayAddress) throws IOException {
+        if (sessionId <= 0) {
+            throw new IllegalArgumentException("Session ID must be a positive integer, got: " + sessionId);
+        }
         this.sessionId = sessionId;
         this.socket = new NeonSocket();
         this.socket.setBlocking(true);

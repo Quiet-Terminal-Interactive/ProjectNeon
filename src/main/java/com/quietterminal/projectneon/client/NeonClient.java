@@ -45,6 +45,9 @@ public class NeonClient implements AutoCloseable {
      * Connects to a relay server and joins a session.
      */
     public boolean connect(int sessionId, String relayAddress) throws IOException {
+        if (sessionId <= 0) {
+            throw new IllegalArgumentException("Session ID must be a positive integer, got: " + sessionId);
+        }
         String[] parts = relayAddress.split(":");
         if (parts.length != 2) {
             throw new IllegalArgumentException("Invalid relay address format. Expected host:port");
