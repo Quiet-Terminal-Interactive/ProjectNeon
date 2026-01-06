@@ -68,6 +68,9 @@ public sealed interface PacketPayload permits
                 throw new IllegalArgumentException("Buffer underflow: not enough bytes for session and game IDs");
             }
             int sessionId = buffer.getInt();
+            if (sessionId <= 0) {
+                throw new IllegalArgumentException("Session ID must be a positive integer, got: " + sessionId);
+            }
             int gameId = buffer.getInt();
             return new ConnectRequest(version, name, sessionId, gameId);
         }
@@ -91,6 +94,9 @@ public sealed interface PacketPayload permits
             }
             byte clientId = buffer.get();
             int sessionId = buffer.getInt();
+            if (sessionId <= 0) {
+                throw new IllegalArgumentException("Session ID must be a positive integer, got: " + sessionId);
+            }
             return new ConnectAccept(clientId, sessionId);
         }
     }
