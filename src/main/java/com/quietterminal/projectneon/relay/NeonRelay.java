@@ -27,6 +27,8 @@ public class NeonRelay implements AutoCloseable {
         int port = parts.length == 2 ? Integer.parseInt(parts[1]) : DEFAULT_PORT;
 
         this.socket = new NeonSocket(port);
+        this.socket.setBlocking(true);
+        this.socket.setSoTimeout(100); // 100ms timeout for responsive processing
         this.sessionManager = new SessionManager();
         this.pendingConnections = new ConcurrentHashMap<>();
         this.lastCleanupTime = System.currentTimeMillis();
@@ -51,11 +53,15 @@ public class NeonRelay implements AutoCloseable {
     public int processPackets() throws IOException {
         int count = 0;
         while (true) {
-            NeonSocket.ReceivedNeonPacket received = socket.receivePacket();
-            if (received == null) break;
+            try {
+                NeonSocket.ReceivedNeonPacket received = socket.receivePacket();
+                if (received == null) break;
 
-            handlePacket(received.packet(), received.source());
-            count++;
+                handlePacket(received.packet(), received.source());
+                count++;
+            } catch (java.net.SocketTimeoutException e) {
+                break;
+            }
         }
         return count;
     }

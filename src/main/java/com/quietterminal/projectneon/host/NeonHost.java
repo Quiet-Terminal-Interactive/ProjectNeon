@@ -38,6 +38,8 @@ public class NeonHost implements AutoCloseable {
     public NeonHost(int sessionId, String relayAddress) throws IOException {
         this.sessionId = sessionId;
         this.socket = new NeonSocket();
+        this.socket.setBlocking(true);
+        this.socket.setSoTimeout(100); // 100ms timeout for responsive processing
 
         String[] parts = relayAddress.split(":");
         if (parts.length != 2) {
@@ -74,11 +76,15 @@ public class NeonHost implements AutoCloseable {
     public int processPackets() throws IOException {
         int count = 0;
         while (true) {
-            NeonSocket.ReceivedNeonPacket received = socket.receivePacket();
-            if (received == null) break;
+            try {
+                NeonSocket.ReceivedNeonPacket received = socket.receivePacket();
+                if (received == null) break;
 
-            handlePacket(received.packet());
-            count++;
+                handlePacket(received.packet());
+                count++;
+            } catch (java.net.SocketTimeoutException e) {
+                break;
+            }
         }
         return count;
     }

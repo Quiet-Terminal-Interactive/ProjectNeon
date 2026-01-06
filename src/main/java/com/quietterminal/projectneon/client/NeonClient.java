@@ -37,6 +37,8 @@ public class NeonClient implements AutoCloseable {
     public NeonClient(String name) throws IOException {
         this.name = name;
         this.socket = new NeonSocket();
+        this.socket.setBlocking(true);
+        this.socket.setSoTimeout(100); // 100ms timeout for responsive processing
     }
 
     /**
@@ -52,7 +54,6 @@ public class NeonClient implements AutoCloseable {
         this.relayAddr = new InetSocketAddress(host, port);
         this.sessionId = sessionId;
 
-        socket.setBlocking(true);
         socket.setSoTimeout(CONNECTION_TIMEOUT_MS);
 
         PacketPayload.ConnectRequest request = new PacketPayload.ConnectRequest(
@@ -77,7 +78,7 @@ public class NeonClient implements AutoCloseable {
                     );
                     socket.sendPacket(confirmation, relayAddr);
 
-                    socket.setBlocking(false);
+                    socket.setSoTimeout(100); // Reset to normal processing timeout
                     return true;
                 }
 
@@ -87,7 +88,7 @@ public class NeonClient implements AutoCloseable {
                 }
             }
         } catch (IOException e) {
-            socket.setBlocking(false);
+            socket.setSoTimeout(100); // Reset to normal processing timeout
             throw e;
         }
     }
@@ -99,11 +100,15 @@ public class NeonClient implements AutoCloseable {
     public int processPackets() throws IOException {
         int count = 0;
         while (true) {
-            NeonSocket.ReceivedNeonPacket received = socket.receivePacket();
-            if (received == null) break;
+            try {
+                NeonSocket.ReceivedNeonPacket received = socket.receivePacket();
+                if (received == null) break;
 
-            handlePacket(received.packet());
-            count++;
+                handlePacket(received.packet());
+                count++;
+            } catch (java.net.SocketTimeoutException e) {
+                break;
+            }
         }
 
         if (autoPing && clientId != null) {
