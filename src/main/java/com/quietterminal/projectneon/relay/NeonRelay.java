@@ -17,6 +17,7 @@ public class NeonRelay implements AutoCloseable {
     private static final long CLEANUP_INTERVAL_MS = 5000;
     private static final long CLIENT_TIMEOUT_MS = 15000;
     private static final int MAX_PACKETS_PER_SECOND = 100;
+    private static final int MAX_CLIENTS_PER_SESSION = 32;
 
     private final NeonSocket socket;
     private final SessionManager sessionManager;
@@ -96,11 +97,26 @@ public class NeonRelay implements AutoCloseable {
     }
 
     private void handleConnectRequest(PacketPayload.ConnectRequest request, SocketAddress source) throws IOException {
+        int sessionId = request.targetSessionId();
+
+        // Check if session has reached maximum client capacity
+        int currentClients = sessionManager.getClientCount(sessionId);
+        if (currentClients >= MAX_CLIENTS_PER_SESSION) {
+            PacketPayload.ConnectDeny deny = new PacketPayload.ConnectDeny("Session is full");
+            PacketHeader header = PacketHeader.create(
+                PacketType.CONNECT_DENY.getValue(), (short) 0, (byte) 0, (byte) 0
+            );
+            NeonPacket denyPacket = new NeonPacket(header, deny);
+            socket.sendPacket(denyPacket, source);
+            System.err.println("Connection denied for " + source + ": session " + sessionId + " is full (" + currentClients + "/" + MAX_CLIENTS_PER_SESSION + ")");
+            return;
+        }
+
         pendingConnections.put(source, new PendingConnection(
-            request.targetSessionId(), request.desiredName(), Instant.now()
+            sessionId, request.desiredName(), Instant.now()
         ));
 
-        Optional<SocketAddress> hostAddr = sessionManager.getHost(request.targetSessionId());
+        Optional<SocketAddress> hostAddr = sessionManager.getHost(sessionId);
         if (hostAddr.isPresent()) {
             PacketHeader header = PacketHeader.create(
                 PacketType.CONNECT_REQUEST.getValue(), (short) 0, (byte) 0, (byte) 1
@@ -245,6 +261,11 @@ class SessionManager {
 
     public List<PeerInfo> getPeers(int sessionId) {
         return sessions.getOrDefault(sessionId, List.of());
+    }
+
+    public int getClientCount(int sessionId) {
+        List<PeerInfo> peers = sessions.get(sessionId);
+        return peers != null ? peers.size() : 0;
     }
 
     public Optional<Integer> getSessionForPeer(SocketAddress addr) {
