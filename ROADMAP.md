@@ -1,0 +1,332 @@
+# Project Neon - Roadmap to 1.0
+
+**Current Version:** 0.2.0
+**Target Version:** 1.0.0
+**Status:** Beta - Not production ready
+
+---
+
+## Overview
+
+Project Neon has a solid foundation with excellent architecture, but requires critical security, testing, and reliability improvements before 1.0 release. This roadmap outlines required work organized by priority.
+
+---
+
+## Critical Blockers (Must Complete for 1.0)
+
+### 1. Security Hardening
+
+#### 1.1 Input Validation (HIGH PRIORITY)
+- [ ] Add security constants to core protocol:
+  ```java
+  public static final int MAX_NAME_LENGTH = 64;
+  public static final int MAX_DESCRIPTION_LENGTH = 256;
+  public static final int MAX_PACKET_COUNT = 100;
+  public static final int MAX_PAYLOAD_SIZE = 65507; // Max UDP payload
+  ```
+- [ ] Fix buffer overflow in `PacketPayload.deserializeConnectRequest()`:
+  - Location: `src/main/java/com/quietterminal/projectneon/core/PacketPayload.java:46-48`
+  - Add: `if (nameLen > MAX_NAME_LENGTH) throw new IllegalArgumentException(...)`
+- [ ] Fix buffer overflow in `PacketPayload.deserializePacketTypeRegistry()`:
+  - Location: `src/main/java/com/quietterminal/projectneon/core/PacketPayload.java:159-164`
+  - Validate count and string lengths
+- [ ] Fix buffer overflow in `PacketPayload.deserializeAck()`:
+  - Location: `src/main/java/com/quietterminal/projectneon/core/PacketPayload.java:233`
+  - Validate packet count
+- [ ] Add ByteBuffer bounds checking before all `.get()` operations
+- [ ] Validate session IDs are positive integers
+- [ ] Sanitize client names (remove control characters, enforce UTF-8)
+
+#### 1.2 Denial of Service Protection
+- [ ] Implement per-client rate limiting in relay (max packets/second)
+- [ ] Add maximum connections per session limit
+- [ ] Add maximum total connections to relay
+- [ ] Implement packet flood detection and throttling
+- [ ] Add memory usage limits for packet queues
+
+#### 1.3 Security Documentation
+- [ ] Add "Security Considerations" section to README.md
+- [ ] Document lack of encryption (plaintext UDP)
+- [ ] Document lack of authentication (open sessions)
+- [ ] Provide recommendations for deploying securely
+- [ ] Add security.md with threat model and mitigations
+- [ ] Document that game developers must implement auth at app layer
+
+---
+
+### 2. Comprehensive Test Suite
+
+#### 2.1 Unit Tests (REQUIRED)
+- [ ] Add JUnit 5 dependency to `pom.xml`
+- [ ] Create `src/test/java/com/quietterminal/projectneon/core/` test package
+- [ ] **PacketHeader Tests:**
+  - [ ] Serialization round-trip
+  - [ ] Magic number validation
+  - [ ] Version compatibility
+  - [ ] Invalid header handling
+- [ ] **PacketPayload Tests:**
+  - [ ] All packet type serialization/deserialization
+  - [ ] Buffer overflow scenarios
+  - [ ] Malformed packet handling
+  - [ ] Empty/null payload handling
+- [ ] **PacketType Tests:**
+  - [ ] Enum value mapping
+  - [ ] Invalid byte values
+  - [ ] Core vs game packet detection
+- [ ] **NeonSocket Tests:**
+  - [ ] Connection lifecycle
+  - [ ] Timeout handling
+  - [ ] Invalid address handling
+  - [ ] Concurrent send/receive
+
+#### 2.2 Integration Tests
+- [ ] Multi-client connection test (10+ clients)
+- [ ] Packet loss simulation test
+- [ ] Network partition test (relay restart)
+- [ ] Large payload test (approach MTU limits)
+- [ ] Concurrent session test (multiple sessions on one relay)
+
+#### 2.3 Reliability Tests
+- [ ] ACK/retry mechanism test
+- [ ] Timeout and cleanup test
+- [ ] Ping/pong heartbeat test
+- [ ] Client disconnect detection test
+
+#### 2.4 Security Tests
+- [ ] Buffer overflow attack test
+- [ ] Packet flood DoS test
+- [ ] Malformed packet fuzzing test
+- [ ] Session hijacking attempt test
+
+#### 2.5 Test Infrastructure
+- [ ] Configure Maven Surefire plugin for test execution
+- [ ] Set up code coverage reporting (JaCoCo)
+- [ ] Target minimum 80% code coverage
+- [ ] Add CI/CD pipeline (GitHub Actions) to run tests automatically
+
+---
+
+### 3. Error Handling Improvements
+
+- [ ] Replace `System.err.println()` with proper logging framework
+  - Recommendation: `java.util.logging` (built-in, no dependencies)
+  - Update: `NeonSocket.java:109`, relay/host/client error printing
+- [ ] Add consistent exception handling strategy:
+  - Document which methods throw checked exceptions
+  - Wrap or declare IOException appropriately
+- [ ] Add detailed error messages with context:
+  - Include packet type, client ID, session ID in errors
+- [ ] Handle `BufferUnderflowException` in packet parsing
+- [ ] Add graceful degradation for non-critical errors
+- [ ] Create custom exception types:
+  - `PacketValidationException`
+  - `ConnectionTimeoutException`
+  - `SessionNotFoundException`
+
+---
+
+### 4. Reliability & Connection Management
+
+#### 4.1 Disconnect Handling
+- [ ] Implement `DISCONNECT_NOTICE` packet sending:
+  - Send when `NeonClient.close()` is called
+  - Send when `NeonHost.close()` is called
+- [ ] Process `DISCONNECT_NOTICE` on receive:
+  - Immediately remove client from relay
+  - Trigger disconnect callback
+  - Clean up resources
+- [ ] Add graceful shutdown timeout (wait for pending ACKs)
+
+#### 4.2 Reconnection Support
+- [ ] Add reconnection logic to `NeonClient`:
+  - Exponential backoff strategy
+  - Configurable max reconnection attempts
+  - State preservation during reconnect
+- [ ] Add session resumption tokens:
+  - Generate unique token on connect
+  - Allow client to rejoin with same client ID
+  - Configurable session timeout
+- [ ] Document reconnection behavior in API
+
+#### 4.3 Reliability Layer (Optional for Game Packets)
+- [ ] Design optional reliability layer for game packets:
+  - Configurable per-packet-type reliability
+  - Use sequence numbers for ordering
+  - ACK mechanism similar to SessionConfig
+- [ ] Add to packet header or make opt-in
+- [ ] Document when to use reliable vs unreliable packets
+
+---
+
+### 5. JNI Implementation
+- [ ] Implement `src/main/native/neon_jni.c`:
+  - JVM initialization and lifecycle
+  - Handle creation/destruction functions
+  - Callback marshalling (C → Java)
+  - Error handling and reporting
+  - Thread safety for callbacks
+- [ ] Build native library for all platforms:
+  - Linux: `libneon_jni.so`
+  - macOS: `libneon_jni.dylib`
+  - Windows: `neon_jni.dll`
+- [ ] Test JNI layer with example C programs
+- [ ] Update build documentation
+- [ ] Add JNI test to CI pipeline
+
+---
+
+## Important Improvements (Should Have for 1.0)
+
+### 6. Configuration API
+
+- [ ] Create `NeonConfig` class for configurable parameters:
+  ```java
+  public class NeonConfig {
+      private int pingInterval = 5000;
+      private int clientTimeout = 15000;
+      private int ackTimeout = 2000;
+      private int maxRetries = 5;
+      private int bufferSize = 1024;
+      private int maxConnections = 100;
+      // getters/setters
+  }
+  ```
+- [ ] Accept `NeonConfig` in constructors for client/host/relay
+- [ ] Replace hardcoded constants throughout codebase
+- [ ] Document configuration options in README
+- [ ] Add validation for config values
+
+---
+
+### 7. API Stability & Polish
+
+- [ ] Review all public APIs for consistency
+- [ ] Ensure all public methods have JavaDoc
+- [ ] Add `@since 1.0` tags to new APIs
+- [ ] Mark internal classes as package-private
+- [ ] Create `@PublicAPI` annotation for guaranteed stability
+- [ ] Review method naming consistency
+- [ ] Add builder pattern for complex configurations
+- [ ] Ensure all callbacks document thread safety
+
+---
+
+### 8. Documentation Updates
+
+#### 8.1 API Documentation
+- [ ] Generate JavaDoc HTML with `mvn javadoc:javadoc`
+- [ ] Publish JavaDoc to GitHub Pages or docs site
+- [ ] Add JavaDoc link to README
+
+#### 8.2 README Improvements
+- [ ] Add "Security Considerations" section
+- [ ] Document UDP unreliability clearly
+- [ ] Add troubleshooting section
+- [ ] Add FAQ section
+- [ ] Update version numbers to 1.0.0
+- [ ] Add badges (build status, version, license)
+
+#### 8.3 Developer Guides
+- [ ] Create `CONTRIBUTING.md`:
+  - Code style guidelines
+  - How to run tests
+  - How to submit issues/PRs
+- [ ] Create `ARCHITECTURE.md`:
+  - Design decisions
+  - Packet flow diagrams
+  - State machine diagrams
+- [ ] Add example projects directory:
+  - Simple chat application
+  - Basic game example
+  - Custom packet type example
+
+---
+
+### 9. Performance Optimization
+
+- [ ] Add buffer pooling for packet processing:
+  - Reduce garbage collection pressure
+  - Reuse byte arrays
+- [ ] Profile relay under high load (1000+ packets/sec)
+- [ ] Optimize hot paths identified by profiling
+- [ ] Consider using virtual threads (Java 21+) for clients
+- [ ] Make receive buffer size configurable
+- [ ] Add batch ACK processing (reduce packet count)
+- [ ] Measure and document performance characteristics:
+  - Latency (p50, p95, p99)
+  - Throughput (packets/second)
+  - Memory usage per connection
+
+---
+
+### 10. Packaging & Distribution
+
+- [ ] Publish to Maven Central:
+  - Set up Sonatype OSSRH account
+  - Add GPG signing to `pom.xml`
+  - Configure Maven deployment
+- [ ] Create GitHub Release for 1.0:
+  - Tag `v1.0.0`
+  - Attach standalone JARs
+  - Write release notes
+- [ ] Add LICENSE file (choose license: MIT, Apache 2.0, etc.)
+- [ ] Add proper Maven metadata:
+  - Developers section
+  - SCM information
+  - Issue tracker URL
+
+---
+## Future Features (Post-1.0)
+
+### Session Persistence
+- [ ] Design session state serialization format
+- [ ] Save relay state to disk periodically
+- [ ] Restore sessions on relay restart
+- [ ] Configurable persistence backend
+
+### Authentication & Authorization
+- [ ] Design authentication framework
+- [ ] Add optional password/token to ConnectRequest
+- [ ] Host validation callback for auth
+- [ ] Session access control lists
+
+### Encryption Support
+- [ ] Research DTLS integration
+- [ ] Add TLS over UDP option
+- [ ] Make encryption opt-in per session
+- [ ] Document performance impact
+
+### Metrics & Monitoring
+- [ ] Expose Prometheus metrics endpoint
+- [ ] Track packet counts, errors, latency
+- [ ] Health check endpoint for relay
+- [ ] Add structured logging (JSON)
+
+### Advanced Features
+- [ ] NAT traversal support (STUN/TURN)
+- [ ] IPv6 support
+- [ ] Compression option for large payloads
+- [ ] WebSocket relay variant for browser clients
+
+---
+
+## How to Contribute
+
+See individual issues for each task. Priority labels:
+-  **Critical** - Blocks 1.0 release
+-  **Important** - Should complete for 1.0
+- **Enhancement** - Nice to have
+
+---
+
+## Version History
+
+- **0.1.0** - Initial protocol design
+- **0.2.0** - Java rewrite, full Maven support (current)
+- **1.0.0** - Production-ready release (target)
+- **1.1.0** - Advanced features (planned)
+
+---
+
+**Last Updated:** 06-01-2026
+**Maintained by:** Kohan Mathers
