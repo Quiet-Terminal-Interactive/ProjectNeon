@@ -72,12 +72,16 @@ public class NeonRelay implements AutoCloseable {
     }
 
     private void handlePacket(NeonPacket packet, SocketAddress source) throws IOException {
-        // Rate limiting check
+        // Rate limiting and flood detection check
         RateLimiter limiter = rateLimiters.computeIfAbsent(source,
             k -> new RateLimiter(MAX_PACKETS_PER_SECOND));
 
         if (!limiter.allowPacket()) {
-            System.err.println("Rate limit exceeded for " + source);
+            if (limiter.isThrottled()) {
+                System.err.println("Rate limit exceeded for " + source + " (THROTTLED after " + limiter.getViolationCount() + " violations)");
+            } else {
+                System.err.println("Rate limit exceeded for " + source);
+            }
             return;
         }
 
@@ -348,26 +352,45 @@ record PeerInfo(
 ) {}
 
 /**
- * Token bucket rate limiter for DoS protection.
+ * Token bucket rate limiter with flood detection for DoS protection.
+ * Tracks violations and implements progressive throttling for repeat offenders.
  */
 class RateLimiter {
+    private static final int FLOOD_THRESHOLD = 3; // Number of violations before throttling
+    private static final long FLOOD_WINDOW_MS = 10000; // 10 second window for flood detection
+    private static final int THROTTLE_PENALTY_DIVISOR = 2; // Reduce rate by half when throttled
+
     private final int maxPacketsPerSecond;
     private int tokens;
     private long lastRefillTime;
+
+    // Flood detection state
+    private int violationCount;
+    private long firstViolationTime;
+    private boolean isThrottled;
 
     public RateLimiter(int maxPacketsPerSecond) {
         this.maxPacketsPerSecond = maxPacketsPerSecond;
         this.tokens = maxPacketsPerSecond;
         this.lastRefillTime = System.currentTimeMillis();
+        this.violationCount = 0;
+        this.firstViolationTime = 0;
+        this.isThrottled = false;
     }
 
     public synchronized boolean allowPacket() {
         refillTokens();
+        checkFloodStatus();
 
-        if (tokens > 0) {
+        int effectiveLimit = isThrottled ? maxPacketsPerSecond / THROTTLE_PENALTY_DIVISOR : maxPacketsPerSecond;
+
+        if (tokens > 0 && tokens <= effectiveLimit) {
             tokens--;
             return true;
         }
+
+        // Packet denied - record violation for flood detection
+        recordViolation();
         return false;
     }
 
@@ -380,5 +403,42 @@ class RateLimiter {
             tokens = Math.min(maxPacketsPerSecond, tokens + tokensToAdd);
             lastRefillTime = now;
         }
+    }
+
+    private void recordViolation() {
+        long now = System.currentTimeMillis();
+
+        if (firstViolationTime == 0 || now - firstViolationTime > FLOOD_WINDOW_MS) {
+            // Start new violation window
+            firstViolationTime = now;
+            violationCount = 1;
+        } else {
+            // Increment violations within window
+            violationCount++;
+
+            if (violationCount >= FLOOD_THRESHOLD && !isThrottled) {
+                isThrottled = true;
+                System.err.println("Flood detected: throttling activated after " + violationCount + " violations");
+            }
+        }
+    }
+
+    private void checkFloodStatus() {
+        long now = System.currentTimeMillis();
+
+        // Clear throttle if violation window has expired
+        if (isThrottled && now - firstViolationTime > FLOOD_WINDOW_MS) {
+            isThrottled = false;
+            violationCount = 0;
+            firstViolationTime = 0;
+        }
+    }
+
+    public boolean isThrottled() {
+        return isThrottled;
+    }
+
+    public int getViolationCount() {
+        return violationCount;
     }
 }
