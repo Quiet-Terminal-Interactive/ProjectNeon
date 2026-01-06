@@ -49,6 +49,9 @@ public sealed interface PacketPayload permits
             buffer.order(ByteOrder.LITTLE_ENDIAN);
             byte version = buffer.get();
             int nameLen = buffer.getInt();
+            if (nameLen < 0 || nameLen > MAX_NAME_LENGTH) {
+                throw new IllegalArgumentException("Name length " + nameLen + " exceeds maximum of " + MAX_NAME_LENGTH);
+            }
             byte[] nameBytes = new byte[nameLen];
             buffer.get(nameBytes);
             String name = new String(nameBytes, StandardCharsets.UTF_8);
@@ -158,14 +161,23 @@ public sealed interface PacketPayload permits
             ByteBuffer buffer = ByteBuffer.wrap(bytes);
             buffer.order(ByteOrder.LITTLE_ENDIAN);
             int count = buffer.getInt();
+            if (count < 0 || count > MAX_PACKET_COUNT) {
+                throw new IllegalArgumentException("Packet type count " + count + " exceeds maximum of " + MAX_PACKET_COUNT);
+            }
             List<PacketTypeEntry> entries = new ArrayList<>(count);
             for (int i = 0; i < count; i++) {
                 byte packetId = buffer.get();
                 int nameLen = buffer.get() & 0xFF;
+                if (nameLen > MAX_NAME_LENGTH) {
+                    throw new IllegalArgumentException("Packet type name length " + nameLen + " exceeds maximum of " + MAX_NAME_LENGTH);
+                }
                 byte[] nameBytes = new byte[nameLen];
                 buffer.get(nameBytes);
                 String name = new String(nameBytes, StandardCharsets.UTF_8);
                 int descLen = buffer.get() & 0xFF;
+                if (descLen > MAX_DESCRIPTION_LENGTH) {
+                    throw new IllegalArgumentException("Packet type description length " + descLen + " exceeds maximum of " + MAX_DESCRIPTION_LENGTH);
+                }
                 byte[] descBytes = new byte[descLen];
                 buffer.get(descBytes);
                 String desc = new String(descBytes, StandardCharsets.UTF_8);
@@ -236,6 +248,9 @@ public sealed interface PacketPayload permits
             ByteBuffer buffer = ByteBuffer.wrap(bytes);
             buffer.order(ByteOrder.LITTLE_ENDIAN);
             int count = buffer.getInt();
+            if (count < 0 || count > MAX_PACKET_COUNT) {
+                throw new IllegalArgumentException("ACK packet count " + count + " exceeds maximum of " + MAX_PACKET_COUNT);
+            }
             List<Short> sequences = new ArrayList<>(count);
             for (int i = 0; i < count; i++) {
                 sequences.add(buffer.getShort());

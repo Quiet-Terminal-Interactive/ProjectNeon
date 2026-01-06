@@ -24,13 +24,13 @@ Project Neon has a solid foundation with excellent architecture, but requires cr
   public static final int MAX_PACKET_COUNT = 100;
   public static final int MAX_PAYLOAD_SIZE = 65507; // Max UDP payload
   ```
-- [ ] Fix buffer overflow in `PacketPayload.deserializeConnectRequest()`:
+- [x] Fix buffer overflow in `PacketPayload.deserializeConnectRequest()`:
   - Location: `src/main/java/com/quietterminal/projectneon/core/PacketPayload.java:46-48`
   - Add: `if (nameLen > MAX_NAME_LENGTH) throw new IllegalArgumentException(...)`
-- [ ] Fix buffer overflow in `PacketPayload.deserializePacketTypeRegistry()`:
+- [x] Fix buffer overflow in `PacketPayload.deserializePacketTypeRegistry()`:
   - Location: `src/main/java/com/quietterminal/projectneon/core/PacketPayload.java:159-164`
   - Validate count and string lengths
-- [ ] Fix buffer overflow in `PacketPayload.deserializeAck()`:
+- [x] Fix buffer overflow in `PacketPayload.deserializeAck()`:
   - Location: `src/main/java/com/quietterminal/projectneon/core/PacketPayload.java:233`
   - Validate packet count
 - [ ] Add ByteBuffer bounds checking before all `.get()` operations
