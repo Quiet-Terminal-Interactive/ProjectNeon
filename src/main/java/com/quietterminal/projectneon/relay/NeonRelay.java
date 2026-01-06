@@ -16,10 +16,12 @@ public class NeonRelay implements AutoCloseable {
     private static final int DEFAULT_PORT = 7777;
     private static final long CLEANUP_INTERVAL_MS = 5000;
     private static final long CLIENT_TIMEOUT_MS = 15000;
+    private static final int MAX_PACKETS_PER_SECOND = 100;
 
     private final NeonSocket socket;
     private final SessionManager sessionManager;
     private final Map<SocketAddress, PendingConnection> pendingConnections;
+    private final Map<SocketAddress, RateLimiter> rateLimiters;
     private long lastCleanupTime;
 
     public NeonRelay(String bindAddress) throws IOException {
@@ -31,6 +33,7 @@ public class NeonRelay implements AutoCloseable {
         this.socket.setSoTimeout(100); // 100ms timeout for responsive processing
         this.sessionManager = new SessionManager();
         this.pendingConnections = new ConcurrentHashMap<>();
+        this.rateLimiters = new ConcurrentHashMap<>();
         this.lastCleanupTime = System.currentTimeMillis();
 
         System.out.println("Relay listening on " + socket.getLocalAddress());
@@ -67,6 +70,15 @@ public class NeonRelay implements AutoCloseable {
     }
 
     private void handlePacket(NeonPacket packet, SocketAddress source) throws IOException {
+        // Rate limiting check
+        RateLimiter limiter = rateLimiters.computeIfAbsent(source,
+            k -> new RateLimiter(MAX_PACKETS_PER_SECOND));
+
+        if (!limiter.allowPacket()) {
+            System.err.println("Rate limit exceeded for " + source);
+            return;
+        }
+
         PacketHeader header = packet.header();
 
         if (header.magic() != PacketHeader.MAGIC) {
@@ -295,3 +307,39 @@ record PeerInfo(
     Instant lastSeen,
     boolean isHost
 ) {}
+
+/**
+ * Token bucket rate limiter for DoS protection.
+ */
+class RateLimiter {
+    private final int maxPacketsPerSecond;
+    private int tokens;
+    private long lastRefillTime;
+
+    public RateLimiter(int maxPacketsPerSecond) {
+        this.maxPacketsPerSecond = maxPacketsPerSecond;
+        this.tokens = maxPacketsPerSecond;
+        this.lastRefillTime = System.currentTimeMillis();
+    }
+
+    public synchronized boolean allowPacket() {
+        refillTokens();
+
+        if (tokens > 0) {
+            tokens--;
+            return true;
+        }
+        return false;
+    }
+
+    private void refillTokens() {
+        long now = System.currentTimeMillis();
+        long timePassed = now - lastRefillTime;
+
+        if (timePassed >= 1000) {
+            int tokensToAdd = (int) (timePassed / 1000) * maxPacketsPerSecond;
+            tokens = Math.min(maxPacketsPerSecond, tokens + tokensToAdd);
+            lastRefillTime = now;
+        }
+    }
+}

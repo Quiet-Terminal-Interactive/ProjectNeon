@@ -38,7 +38,7 @@ Project Neon has a solid foundation with excellent architecture, but requires cr
 - [x] Sanitize client names (remove control characters, enforce UTF-8)
 
 #### 1.2 Denial of Service Protection
-- [ ] Implement per-client rate limiting in relay (max packets/second)
+- [x] Implement per-client rate limiting in relay (max packets/second)
 - [ ] Add maximum connections per session limit
 - [ ] Add maximum total connections to relay
 - [ ] Implement packet flood detection and throttling
