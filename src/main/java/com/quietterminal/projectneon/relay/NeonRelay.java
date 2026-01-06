@@ -3,7 +3,6 @@ package com.quietterminal.projectneon.relay;
 import com.quietterminal.projectneon.core.*;
 
 import java.io.IOException;
-import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.time.Instant;
 import java.util.*;
@@ -119,6 +118,7 @@ public class NeonRelay implements AutoCloseable {
         }
     }
 
+    @SuppressWarnings("unused")
     private void routePacket(NeonPacket packet, SocketAddress source) throws IOException {
         PacketHeader header = packet.header();
         byte clientId = header.clientId();

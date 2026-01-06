@@ -1,8 +1,5 @@
 package com.quietterminal.projectneon.jni;
 
-import com.quietterminal.projectneon.client.NeonClient;
-import com.quietterminal.projectneon.core.PacketPayload;
-
 /**
  * JNI wrapper for NeonClient to enable C/C++ integration.
  *

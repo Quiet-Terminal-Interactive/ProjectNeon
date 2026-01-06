@@ -19,7 +19,6 @@ public class NeonTest {
 
         CountDownLatch relayReady = new CountDownLatch(1);
         CountDownLatch hostReady = new CountDownLatch(1);
-        CountDownLatch testComplete = new CountDownLatch(1);
 
         Thread relayThread = new Thread(() -> {
             try (NeonRelay relay = new NeonRelay(RELAY_ADDR)) {
