@@ -17,7 +17,7 @@ Project Neon has a solid foundation with excellent architecture, but requires cr
 ### 1. Security Hardening
 
 #### 1.1 Input Validation (HIGH PRIORITY)
-- [ ] Add security constants to core protocol:
+- [x] Add security constants to core protocol:
   ```java
   public static final int MAX_NAME_LENGTH = 64;
   public static final int MAX_DESCRIPTION_LENGTH = 256;

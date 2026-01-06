@@ -21,6 +21,11 @@ public sealed interface PacketPayload permits
     PacketPayload.Ack,
     PacketPayload.GamePacket {
 
+    int MAX_NAME_LENGTH = 64;
+    int MAX_DESCRIPTION_LENGTH = 256;
+    int MAX_PACKET_COUNT = 100;
+    int MAX_PAYLOAD_SIZE = 65507;
+
     byte[] toBytes();
 
     record ConnectRequest(byte clientVersion, String desiredName, int targetSessionId, int gameIdentifier)
