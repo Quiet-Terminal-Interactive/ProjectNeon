@@ -35,7 +35,7 @@ public class NeonTest {
 
         try {
             relayReady.await(2, TimeUnit.SECONDS);
-            Thread.sleep(500); // Give relay time to bind
+            Thread.sleep(500);
 
             Thread hostThread = new Thread(() -> {
                 try (NeonHost host = new NeonHost(SESSION_ID, RELAY_ADDR)) {
@@ -68,7 +68,7 @@ public class NeonTest {
             client2Thread.setDaemon(true);
 
             client1Thread.start();
-            Thread.sleep(1000); // Stagger client connections
+            Thread.sleep(1000);
             client2Thread.start();
 
             System.out.println("\n[TEST] Running for " + TEST_DURATION_SECONDS + " seconds...\n");
