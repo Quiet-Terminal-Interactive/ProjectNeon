@@ -9,11 +9,14 @@ import java.time.Duration;
 import java.util.Optional;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Neon protocol client implementation.
  */
 public class NeonClient implements AutoCloseable {
+    private static final Logger logger = Logger.getLogger(NeonClient.class.getName());
     private static final long DEFAULT_PING_INTERVAL_MS = 5000;
     private static final int CONNECTION_TIMEOUT_MS = 10000;
 
@@ -86,7 +89,8 @@ public class NeonClient implements AutoCloseable {
                 }
 
                 if (received.packet().payload() instanceof PacketPayload.ConnectDeny deny) {
-                    System.err.println("Connection denied: " + deny.reason());
+                    logger.log(Level.WARNING, "Connection denied: {0} [SessionID={1}, ClientName={2}]",
+                        new Object[]{deny.reason(), sessionId, name});
                     return false;
                 }
             }

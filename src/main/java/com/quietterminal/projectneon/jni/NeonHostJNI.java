@@ -1,14 +1,19 @@
 package com.quietterminal.projectneon.jni;
 
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
 /**
  * JNI wrapper for NeonHost to enable C/C++ integration.
  */
 public class NeonHostJNI {
+    private static final Logger logger = Logger.getLogger(NeonHostJNI.class.getName());
 
     static {
         try {
             System.loadLibrary("neon_jni");
         } catch (UnsatisfiedLinkError e) {
+            logger.log(Level.SEVERE, "Failed to load neon_jni library", e);
             System.err.println("Failed to load neon_jni library: " + e.getMessage());
         }
     }

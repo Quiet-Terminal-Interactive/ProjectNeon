@@ -2,13 +2,17 @@ package com.quietterminal.projectneon.core;
 
 import java.io.IOException;
 import java.net.*;
+import java.nio.BufferUnderflowException;
 import java.nio.channels.DatagramChannel;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * UDP socket wrapper for Neon protocol operations.
  * Supports both blocking and non-blocking modes.
  */
 public class NeonSocket implements AutoCloseable {
+    private static final Logger logger = Logger.getLogger(NeonSocket.class.getName());
     private static final int BUFFER_SIZE = 1024;
     private final DatagramChannel channel;
     private final DatagramSocket socket;
@@ -105,8 +109,14 @@ public class NeonSocket implements AutoCloseable {
         try {
             NeonPacket packet = NeonPacket.fromBytes(received.data());
             return new ReceivedNeonPacket(packet, received.source());
+        } catch (BufferUnderflowException e) {
+            logger.log(Level.WARNING, "Buffer underflow parsing packet from {0}: packet too short or malformed", received.source());
+            return null;
+        } catch (IllegalArgumentException e) {
+            logger.log(Level.WARNING, "Invalid packet from {0}: {1}", new Object[]{received.source(), e.getMessage()});
+            return null;
         } catch (Exception e) {
-            System.err.println("Failed to parse packet from " + received.source() + ": " + e.getMessage());
+            logger.log(Level.SEVERE, "Unexpected error parsing packet from " + received.source(), e);
             return null;
         }
     }

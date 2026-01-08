@@ -7,12 +7,15 @@ import java.net.SocketAddress;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Neon protocol relay server.
  * Routes packets between hosts and clients in a completely payload-agnostic manner.
  */
 public class NeonRelay implements AutoCloseable {
+    private static final Logger logger = Logger.getLogger(NeonRelay.class.getName());
     private static final int DEFAULT_PORT = 7777;
     private static final long CLEANUP_INTERVAL_MS = 5000;
     private static final long CLIENT_TIMEOUT_MS = 15000;
@@ -75,7 +78,7 @@ public class NeonRelay implements AutoCloseable {
 
     private void handlePacket(NeonPacket packet, SocketAddress source) throws IOException {
         if (!rateLimiters.containsKey(source) && rateLimiters.size() >= MAX_RATE_LIMITERS) {
-            System.err.println("Rate limiter capacity exceeded for " + source + " - dropping packet");
+            logger.log(Level.WARNING, "Rate limiter capacity exceeded for {0} - dropping packet", source);
             return;
         }
 
@@ -84,9 +87,10 @@ public class NeonRelay implements AutoCloseable {
 
         if (!limiter.allowPacket()) {
             if (limiter.isThrottled()) {
-                System.err.println("Rate limit exceeded for " + source + " (THROTTLED after " + limiter.getViolationCount() + " violations)");
+                logger.log(Level.WARNING, "Rate limit exceeded for {0} (THROTTLED after {1} violations)",
+                    new Object[]{source, limiter.getViolationCount()});
             } else {
-                System.err.println("Rate limit exceeded for " + source);
+                logger.log(Level.WARNING, "Rate limit exceeded for {0}", source);
             }
             return;
         }
@@ -94,7 +98,7 @@ public class NeonRelay implements AutoCloseable {
         PacketHeader header = packet.header();
 
         if (header.magic() != PacketHeader.MAGIC) {
-            System.err.println("Invalid magic number from " + source);
+            logger.log(Level.WARNING, "Invalid magic number from {0}", source);
             return;
         }
 
@@ -118,7 +122,8 @@ public class NeonRelay implements AutoCloseable {
             );
             NeonPacket denyPacket = new NeonPacket(header, deny);
             socket.sendPacket(denyPacket, source);
-            System.err.println("Connection denied for " + source + ": relay is full (" + totalConnections + "/" + MAX_TOTAL_CONNECTIONS + ")");
+            logger.log(Level.WARNING, "Connection denied for {0}: relay is full ({1}/{2}) [SessionID={3}]",
+                new Object[]{source, totalConnections, MAX_TOTAL_CONNECTIONS, sessionId});
             return;
         }
 
@@ -130,7 +135,8 @@ public class NeonRelay implements AutoCloseable {
             );
             NeonPacket denyPacket = new NeonPacket(header, deny);
             socket.sendPacket(denyPacket, source);
-            System.err.println("Connection denied for " + source + ": session " + sessionId + " is full (" + currentClients + "/" + MAX_CLIENTS_PER_SESSION + ")");
+            logger.log(Level.WARNING, "Connection denied for {0}: session {1} is full ({2}/{3})",
+                new Object[]{source, sessionId, currentClients, MAX_CLIENTS_PER_SESSION});
             return;
         }
 
@@ -141,7 +147,8 @@ public class NeonRelay implements AutoCloseable {
             );
             NeonPacket denyPacket = new NeonPacket(header, deny);
             socket.sendPacket(denyPacket, source);
-            System.err.println("Connection denied for " + source + ": pending connections queue full (" + pendingConnections.size() + "/" + MAX_PENDING_CONNECTIONS + ")");
+            logger.log(Level.WARNING, "Connection denied for {0}: pending connections queue full ({1}/{2}) [SessionID={3}]",
+                new Object[]{source, pendingConnections.size(), MAX_PENDING_CONNECTIONS, sessionId});
             return;
         }
 
@@ -195,7 +202,8 @@ public class NeonRelay implements AutoCloseable {
 
         Optional<Integer> sessionId = sessionManager.getSessionForPeer(source);
         if (sessionId.isEmpty()) {
-            System.err.println("No session found for peer " + source);
+            logger.log(Level.WARNING, "No session found for peer {0} [PacketType={1}]",
+                new Object[]{source, header.packetType()});
             return;
         }
 
@@ -213,7 +221,8 @@ public class NeonRelay implements AutoCloseable {
             if (targetAddr.isPresent()) {
                 socket.sendPacket(packet, targetAddr.get());
             } else {
-                System.err.println("Target client " + destId + " not found in session " + session);
+                logger.log(Level.WARNING, "Target client {0} not found in session {1} [ClientID={2}, PacketType={3}]",
+                    new Object[]{destId, session, clientId, header.packetType()});
             }
         }
     }
@@ -451,7 +460,8 @@ class RateLimiter {
 
             if (violationCount >= FLOOD_THRESHOLD && !isThrottled) {
                 isThrottled = true;
-                System.err.println("Flood detected: throttling activated after " + violationCount + " violations");
+                Logger.getLogger(RateLimiter.class.getName()).log(Level.WARNING,
+                    "Flood detected: throttling activated after {0} violations", violationCount);
             }
         }
     }

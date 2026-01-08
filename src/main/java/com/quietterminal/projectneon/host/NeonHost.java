@@ -9,12 +9,15 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Neon protocol host implementation.
  * The host manages game sessions and coordinates clients through a relay.
  */
 public class NeonHost implements AutoCloseable {
+    private static final Logger logger = Logger.getLogger(NeonHost.class.getName());
     private static final byte HOST_CLIENT_ID = 1;
     private static final byte FIRST_CLIENT_ID = 2;
     private static final int ACK_TIMEOUT_MS = 2000;
@@ -191,7 +194,8 @@ public class NeonHost implements AutoCloseable {
 
             if (now - pending.lastSentTime() >= ACK_TIMEOUT_MS) {
                 if (pending.retryCount() >= MAX_ACK_RETRIES) {
-                    System.err.println("Client " + pending.clientId() + " failed to ACK after " + MAX_ACK_RETRIES + " retries");
+                    logger.log(Level.WARNING, "Client {0} failed to ACK after {1} retries [SessionID={2}, Sequence={3}]",
+                        new Object[]{pending.clientId(), MAX_ACK_RETRIES, sessionId, pending.sequence()});
                     toRemove.add(entry.getKey());
                 } else {
                     socket.sendPacket(pending.packet(), relayAddr);

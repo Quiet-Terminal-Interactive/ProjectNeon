@@ -1,5 +1,8 @@
 package com.quietterminal.projectneon.jni;
 
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
 /**
  * JNI wrapper for NeonClient to enable C/C++ integration.
  *
@@ -7,11 +10,13 @@ package com.quietterminal.projectneon.jni;
  * for game engine integration (Unreal, Unity, custom engines).
  */
 public class NeonClientJNI {
+    private static final Logger logger = Logger.getLogger(NeonClientJNI.class.getName());
 
     static {
         try {
             System.loadLibrary("neon_jni");
         } catch (UnsatisfiedLinkError e) {
+            logger.log(Level.SEVERE, "Failed to load neon_jni library", e);
             System.err.println("Failed to load neon_jni library: " + e.getMessage());
         }
     }

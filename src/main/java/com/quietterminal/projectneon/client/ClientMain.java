@@ -3,11 +3,15 @@ package com.quietterminal.projectneon.client;
 import com.quietterminal.projectneon.core.PacketPayload;
 
 import java.util.Scanner;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * CLI entry point for the Neon client.
  */
 public class ClientMain {
+    private static final Logger logger = Logger.getLogger(ClientMain.class.getName());
+
     public static void main(String[] args) {
         try (Scanner scanner = new Scanner(System.in)) {
             System.out.println("=== Project Neon Client ===");
@@ -16,6 +20,7 @@ public class ClientMain {
             System.out.print("Enter your name: ");
             String name = scanner.nextLine().trim();
             if (name.isEmpty()) {
+                logger.log(Level.SEVERE, "Name cannot be empty");
                 System.err.println("Name cannot be empty");
                 return;
             }
@@ -25,6 +30,7 @@ public class ClientMain {
             try {
                 sessionId = Integer.parseInt(scanner.nextLine().trim());
             } catch (NumberFormatException e) {
+                logger.log(Level.SEVERE, "Invalid session ID provided", e);
                 System.err.println("Invalid session ID");
                 return;
             }
@@ -60,15 +66,19 @@ public class ClientMain {
                         " from client " + (fromClientId & 0xFF))
                 );
 
-                client.setWrongDestinationCallback((myId, destId) ->
+                client.setWrongDestinationCallback((myId, destId) -> {
+                    logger.log(Level.WARNING, "Received packet for client {0} but I am client {1}",
+                        new Object[]{destId & 0xFF, myId & 0xFF});
                     System.err.println("Received packet for client " + (destId & 0xFF) +
-                        " but I am client " + (myId & 0xFF))
-                );
+                        " but I am client " + (myId & 0xFF));
+                });
 
                 System.out.println("\nConnecting to relay at " + relayAddr + "...");
                 boolean connected = client.connect(sessionId, relayAddr);
 
                 if (!connected) {
+                    logger.log(Level.SEVERE, "Failed to connect to relay at {0} [SessionID={1}, ClientName={2}]",
+                        new Object[]{relayAddr, sessionId, name});
                     System.err.println("Failed to connect");
                     return;
                 }
@@ -81,6 +91,7 @@ public class ClientMain {
                 client.run();
 
             } catch (Exception e) {
+                logger.log(Level.SEVERE, "Client error", e);
                 System.err.println("Error: " + e.getMessage());
                 e.printStackTrace();
             }

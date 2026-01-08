@@ -1,11 +1,15 @@
 package com.quietterminal.projectneon.host;
 
 import java.util.Random;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * CLI entry point for the Neon host.
  */
 public class HostMain {
+    private static final Logger logger = Logger.getLogger(HostMain.class.getName());
+
     public static void main(String[] args) {
         try {
             System.out.println("=== Project Neon Host ===");
@@ -16,6 +20,7 @@ public class HostMain {
                 try {
                     sessionId = Integer.parseInt(args[0]);
                 } catch (NumberFormatException e) {
+                    logger.log(Level.SEVERE, "Invalid session ID argument: {0}", args[0]);
                     System.err.println("Invalid session ID. Usage: java HostMain [sessionId]");
                     return;
                 }
@@ -54,10 +59,12 @@ public class HostMain {
                 host.start();
 
             } catch (Exception e) {
+                logger.log(Level.SEVERE, "Host error [SessionID=" + sessionId + "]", e);
                 System.err.println("Error: " + e.getMessage());
                 e.printStackTrace();
             }
         } catch (Exception e) {
+            logger.log(Level.SEVERE, "Fatal error during host initialization", e);
             System.err.println("Fatal error: " + e.getMessage());
             e.printStackTrace();
         }
