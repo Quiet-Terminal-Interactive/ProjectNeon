@@ -41,6 +41,7 @@ public record NeonPacket(PacketHeader header, PacketPayload payload) {
             case PONG -> PacketPayload.Pong.fromBytes(payloadBytes);
             case DISCONNECT_NOTICE -> PacketPayload.DisconnectNotice.fromBytes(payloadBytes);
             case ACK -> PacketPayload.Ack.fromBytes(payloadBytes);
+            case RECONNECT_REQUEST -> PacketPayload.ReconnectRequest.fromBytes(payloadBytes);
             case GAME_PACKET -> PacketPayload.GamePacket.fromBytes(payloadBytes);
         };
 
