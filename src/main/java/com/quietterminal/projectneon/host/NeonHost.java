@@ -24,6 +24,7 @@ public class NeonHost implements AutoCloseable {
     private static final int MAX_ACK_RETRIES = 5;
     private static final long RELIABILITY_DELAY_MS = 50;
     private static final int GRACEFUL_SHUTDOWN_TIMEOUT_MS = 2000;
+    private static final long SESSION_TOKEN_TIMEOUT_MS = 300000;
 
     private final NeonSocket socket;
     private final int sessionId;
@@ -33,6 +34,9 @@ public class NeonHost implements AutoCloseable {
 
     private final Map<Byte, String> connectedClients = new ConcurrentHashMap<>();
     private final Map<Byte, PendingAck> pendingAcks = new ConcurrentHashMap<>();
+    private final Map<Byte, Long> clientTokens = new ConcurrentHashMap<>();
+    private final Map<Byte, DisconnectedClient> disconnectedClients = new ConcurrentHashMap<>();
+    private final java.security.SecureRandom secureRandom = new java.security.SecureRandom();
 
     private TriConsumer<Byte, String, Integer> clientConnectCallback; // (clientId, name, sessionId)
     private BiConsumer<String, String> clientDenyCallback; // (name, reason)
@@ -63,7 +67,12 @@ public class NeonHost implements AutoCloseable {
      * This is a blocking call that runs the host processing loop.
      */
     public void start() throws IOException, InterruptedException {
-        PacketPayload.ConnectAccept registration = new PacketPayload.ConnectAccept(HOST_CLIENT_ID, sessionId);
+        long hostToken = secureRandom.nextLong();
+        clientTokens.put(HOST_CLIENT_ID, hostToken);
+
+        PacketPayload.ConnectAccept registration = new PacketPayload.ConnectAccept(
+            HOST_CLIENT_ID, sessionId, hostToken
+        );
         NeonPacket packet = NeonPacket.create(
             PacketType.CONNECT_ACCEPT, nextSequence++, HOST_CLIENT_ID, (byte) 0, registration
         );
@@ -102,6 +111,7 @@ public class NeonHost implements AutoCloseable {
 
         switch (packet.payload()) {
             case PacketPayload.ConnectRequest request -> handleConnectRequest(request, header);
+            case PacketPayload.ReconnectRequest request -> handleReconnectRequest(request, header);
             case PacketPayload.Ping ping -> {
                 if (pingReceivedCallback != null) {
                     pingReceivedCallback.accept(header.clientId());
@@ -115,7 +125,14 @@ public class NeonHost implements AutoCloseable {
             }
             case PacketPayload.DisconnectNotice ignored -> {
                 byte disconnectedClientId = header.clientId();
-                connectedClients.remove(disconnectedClientId);
+                String clientName = connectedClients.remove(disconnectedClientId);
+                Long token = clientTokens.get(disconnectedClientId);
+
+                if (clientName != null && token != null) {
+                    disconnectedClients.put(disconnectedClientId,
+                        new DisconnectedClient(clientName, token, System.currentTimeMillis()));
+                }
+
                 pendingAcks.remove(disconnectedClientId);
                 if (clientDisconnectCallback != null) {
                     clientDisconnectCallback.accept(disconnectedClientId);
@@ -145,7 +162,10 @@ public class NeonHost implements AutoCloseable {
         byte assignedId = nextClientId++;
         connectedClients.put(assignedId, clientName);
 
-        PacketPayload.ConnectAccept accept = new PacketPayload.ConnectAccept(assignedId, sessionId);
+        long clientToken = secureRandom.nextLong();
+        clientTokens.put(assignedId, clientToken);
+
+        PacketPayload.ConnectAccept accept = new PacketPayload.ConnectAccept(assignedId, sessionId, clientToken);
         NeonPacket acceptPacket = NeonPacket.create(
             PacketType.CONNECT_ACCEPT, nextSequence++, HOST_CLIENT_ID, (byte) 0, accept
         );
@@ -179,6 +199,55 @@ public class NeonHost implements AutoCloseable {
             PacketType.PACKET_TYPE_REGISTRY, nextSequence++, HOST_CLIENT_ID, assignedId, registry
         );
         socket.sendPacket(registryPacket, relayAddr);
+    }
+
+    private void handleReconnectRequest(PacketPayload.ReconnectRequest request, PacketHeader header) throws IOException {
+        byte clientId = request.previousClientId();
+        long providedToken = request.sessionToken();
+
+        DisconnectedClient disconnected = disconnectedClients.get(clientId);
+        if (disconnected == null) {
+            sendConnectDeny("", "Session expired or not found");
+            logger.log(Level.WARNING, "Reconnect attempt for unknown client {0} [SessionID={1}]",
+                new Object[]{clientId, sessionId});
+            return;
+        }
+
+        if (disconnected.token() != providedToken) {
+            sendConnectDeny("", "Invalid session token");
+            logger.log(Level.WARNING, "Reconnect attempt with invalid token for client {0} [SessionID={1}]",
+                new Object[]{clientId, sessionId});
+            return;
+        }
+
+        long now = System.currentTimeMillis();
+        if (now - disconnected.disconnectTime() > SESSION_TOKEN_TIMEOUT_MS) {
+            disconnectedClients.remove(clientId);
+            sendConnectDeny("", "Session timeout exceeded");
+            logger.log(Level.WARNING, "Reconnect attempt after timeout for client {0} [SessionID={1}]",
+                new Object[]{clientId, sessionId});
+            return;
+        }
+
+        connectedClients.put(clientId, disconnected.name());
+        clientTokens.put(clientId, providedToken);
+        disconnectedClients.remove(clientId);
+
+        long newToken = secureRandom.nextLong();
+        clientTokens.put(clientId, newToken);
+
+        PacketPayload.ConnectAccept accept = new PacketPayload.ConnectAccept(clientId, sessionId, newToken);
+        NeonPacket acceptPacket = NeonPacket.create(
+            PacketType.CONNECT_ACCEPT, nextSequence++, HOST_CLIENT_ID, (byte) 0, accept
+        );
+        socket.sendPacket(acceptPacket, relayAddr);
+
+        if (clientConnectCallback != null) {
+            clientConnectCallback.accept(clientId, disconnected.name(), sessionId);
+        }
+
+        logger.log(Level.INFO, "Client {0} reconnected [SessionID={1}]",
+            new Object[]{clientId, sessionId});
     }
 
     private void sendConnectDeny(String clientName, String reason) throws IOException {
@@ -301,6 +370,15 @@ public class NeonHost implements AutoCloseable {
         NeonPacket packet,
         long lastSentTime,
         int retryCount
+    ) {}
+
+    /**
+     * Tracks disconnected clients for reconnection support.
+     */
+    private record DisconnectedClient(
+        String name,
+        long token,
+        long disconnectTime
     ) {}
 
     /**

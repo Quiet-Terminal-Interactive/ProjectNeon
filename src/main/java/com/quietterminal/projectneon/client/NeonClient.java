@@ -19,12 +19,16 @@ public class NeonClient implements AutoCloseable {
     private static final Logger logger = Logger.getLogger(NeonClient.class.getName());
     private static final long DEFAULT_PING_INTERVAL_MS = 5000;
     private static final int CONNECTION_TIMEOUT_MS = 10000;
+    private static final int MAX_RECONNECT_ATTEMPTS = 5;
+    private static final int INITIAL_RECONNECT_DELAY_MS = 1000;
+    private static final int MAX_RECONNECT_DELAY_MS = 30000;
 
     private final NeonSocket socket;
     private final String name;
     private SocketAddress relayAddr;
     private Byte clientId;
     private Integer sessionId;
+    private Long sessionToken;
     private short nextSequence = 0;
 
     private boolean autoPing = true;
@@ -79,13 +83,16 @@ public class NeonClient implements AutoCloseable {
                 if (received.packet().payload() instanceof PacketPayload.ConnectAccept accept) {
                     this.clientId = accept.assignedClientId();
                     this.sessionId = accept.sessionId();
+                    this.sessionToken = accept.sessionToken();
 
                     NeonPacket confirmation = NeonPacket.create(
                         PacketType.CONNECT_ACCEPT, nextSequence++, clientId, (byte) 0, accept
                     );
                     socket.sendPacket(confirmation, relayAddr);
 
-                    socket.setSoTimeout(100); // Reset to normal processing timeout
+                    socket.setSoTimeout(100);
+                    logger.log(Level.INFO, "Connected to session {0} as client {1} [Token={2}]",
+                        new Object[]{sessionId, clientId, sessionToken});
                     return true;
                 }
 
@@ -225,8 +232,97 @@ public class NeonClient implements AutoCloseable {
         return Optional.ofNullable(sessionId);
     }
 
+    public Optional<Long> getSessionToken() {
+        return Optional.ofNullable(sessionToken);
+    }
+
     public boolean isConnected() {
         return clientId != null;
+    }
+
+    /**
+     * Attempts to reconnect to the session using the stored session token.
+     * Uses exponential backoff with configurable max attempts.
+     *
+     * @param maxAttempts Maximum number of reconnection attempts
+     * @return true if reconnection succeeded, false otherwise
+     */
+    public boolean reconnect(int maxAttempts) throws IOException, InterruptedException {
+        if (sessionToken == null || sessionId == null || clientId == null || relayAddr == null) {
+            logger.log(Level.WARNING, "Cannot reconnect: missing session state");
+            return false;
+        }
+
+        int attempt = 0;
+        int delayMs = INITIAL_RECONNECT_DELAY_MS;
+
+        while (attempt < maxAttempts) {
+            attempt++;
+            logger.log(Level.INFO, "Reconnection attempt {0}/{1} [SessionID={2}, ClientID={3}]",
+                new Object[]{attempt, maxAttempts, sessionId, clientId});
+
+            try {
+                if (attemptReconnect()) {
+                    logger.log(Level.INFO, "Reconnection successful [SessionID={0}, ClientID={1}]",
+                        new Object[]{sessionId, clientId});
+                    return true;
+                }
+            } catch (IOException e) {
+                logger.log(Level.WARNING, "Reconnection attempt {0} failed: {1}",
+                    new Object[]{attempt, e.getMessage()});
+            }
+
+            if (attempt < maxAttempts) {
+                Thread.sleep(delayMs);
+                delayMs = Math.min(delayMs * 2, MAX_RECONNECT_DELAY_MS);
+            }
+        }
+
+        logger.log(Level.WARNING, "Reconnection failed after {0} attempts [SessionID={1}]",
+            new Object[]{maxAttempts, sessionId});
+        return false;
+    }
+
+    /**
+     * Attempts to reconnect using default max attempts.
+     */
+    public boolean reconnect() throws IOException, InterruptedException {
+        return reconnect(MAX_RECONNECT_ATTEMPTS);
+    }
+
+    private boolean attemptReconnect() throws IOException {
+        socket.setSoTimeout(CONNECTION_TIMEOUT_MS);
+
+        PacketPayload.ReconnectRequest request = new PacketPayload.ReconnectRequest(
+            sessionToken, sessionId, clientId
+        );
+        NeonPacket packet = NeonPacket.create(
+            PacketType.RECONNECT_REQUEST, nextSequence++, clientId, (byte) 1, request
+        );
+        socket.sendPacket(packet, relayAddr);
+
+        try {
+            long startTime = System.currentTimeMillis();
+            while (System.currentTimeMillis() - startTime < CONNECTION_TIMEOUT_MS) {
+                NeonSocket.ReceivedNeonPacket received = socket.receivePacket();
+                if (received == null) continue;
+
+                if (received.packet().payload() instanceof PacketPayload.ConnectAccept accept) {
+                    this.sessionToken = accept.sessionToken();
+                    socket.setSoTimeout(100);
+                    return true;
+                }
+
+                if (received.packet().payload() instanceof PacketPayload.ConnectDeny deny) {
+                    logger.log(Level.WARNING, "Reconnection denied: {0} [SessionID={1}, ClientID={2}]",
+                        new Object[]{deny.reason(), sessionId, clientId});
+                    return false;
+                }
+            }
+            return false;
+        } finally {
+            socket.setSoTimeout(100);
+        }
     }
 
     public void setAutoPing(boolean enabled) {

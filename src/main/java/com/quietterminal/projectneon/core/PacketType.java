@@ -15,6 +15,7 @@ public enum PacketType {
     PONG((byte) 0x0C),
     DISCONNECT_NOTICE((byte) 0x0D),
     ACK((byte) 0x0E),
+    RECONNECT_REQUEST((byte) 0x0F),
     GAME_PACKET((byte) 0x10);
 
     private final byte value;
@@ -38,6 +39,7 @@ public enum PacketType {
             case 0x0C -> PONG;
             case 0x0D -> DISCONNECT_NOTICE;
             case 0x0E -> ACK;
+            case 0x0F -> RECONNECT_REQUEST;
             default -> {
                 if ((value & 0xFF) >= 0x10) {
                     yield GAME_PACKET;

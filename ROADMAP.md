@@ -144,16 +144,17 @@ Project Neon has a solid foundation with excellent architecture, but requires cr
   - Clean up resources
 - [x] Add graceful shutdown timeout (wait for pending ACKs)
 
-#### 4.2 Reconnection Support
-- [ ] Add reconnection logic to `NeonClient`:
-  - Exponential backoff strategy
-  - Configurable max reconnection attempts
+#### ~~4.2 Reconnection Support~~ COMPLETE
+- [x] Add reconnection logic to `NeonClient`:
+  - Exponential backoff strategy (1s → 2s → 4s → 8s → 16s → 30s max)
+  - Configurable max reconnection attempts (default: 5)
   - State preservation during reconnect
-- [ ] Add session resumption tokens:
-  - Generate unique token on connect
+- [x] Add session resumption tokens:
+  - Generate unique token on connect (SecureRandom)
   - Allow client to rejoin with same client ID
-  - Configurable session timeout
-- [ ] Document reconnection behavior in API
+  - Configurable session timeout (default: 5 minutes)
+- [x] Relay forwards reconnect requests to host
+- [x] Host validates tokens and timeout before accepting reconnection
 
 #### 4.3 Reliability Layer (Optional for Game Packets)
 - [ ] Design optional reliability layer for game packets:

@@ -105,6 +105,7 @@ public class NeonRelay implements AutoCloseable {
         switch (packet.payload()) {
             case PacketPayload.ConnectRequest request -> handleConnectRequest(request, source);
             case PacketPayload.ConnectAccept accept -> handleConnectAccept(accept, source, header);
+            case PacketPayload.ReconnectRequest request -> handleReconnectRequest(request, source);
             case PacketPayload.DisconnectNotice ignored -> handleDisconnectNotice(source, header);
             default -> {
                 routePacket(packet, source);
@@ -190,6 +191,31 @@ public class NeonRelay implements AutoCloseable {
             }
 
             routeToClient(sessionId, clientId, accept, header);
+        }
+    }
+
+    private void handleReconnectRequest(PacketPayload.ReconnectRequest request, SocketAddress source) throws IOException {
+        int sessionId = request.targetSessionId();
+
+        Optional<SocketAddress> hostAddr = sessionManager.getHost(sessionId);
+        if (hostAddr.isPresent()) {
+            PacketHeader header = PacketHeader.create(
+                PacketType.RECONNECT_REQUEST.getValue(), (short) 0, request.previousClientId(), (byte) 1
+            );
+            NeonPacket forwardPacket = new NeonPacket(header, request);
+            socket.sendPacket(forwardPacket, hostAddr.get());
+
+            sessionManager.registerPeer(sessionId, request.previousClientId(), source, false);
+            logger.log(Level.INFO, "Reconnect request forwarded for client {0} [SessionID={1}]",
+                new Object[]{request.previousClientId(), sessionId});
+        } else {
+            PacketPayload.ConnectDeny deny = new PacketPayload.ConnectDeny("Session not found");
+            PacketHeader header = PacketHeader.create(
+                PacketType.CONNECT_DENY.getValue(), (short) 0, (byte) 0, (byte) 0
+            );
+            NeonPacket denyPacket = new NeonPacket(header, deny);
+            socket.sendPacket(denyPacket, source);
+            logger.log(Level.WARNING, "Reconnect request for non-existent session {0}", sessionId);
         }
     }
 

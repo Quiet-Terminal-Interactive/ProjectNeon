@@ -19,6 +19,7 @@ public sealed interface PacketPayload permits
     PacketPayload.Pong,
     PacketPayload.DisconnectNotice,
     PacketPayload.Ack,
+    PacketPayload.ReconnectRequest,
     PacketPayload.GamePacket {
 
     int MAX_NAME_LENGTH = 64;
@@ -92,28 +93,30 @@ public sealed interface PacketPayload permits
         }
     }
 
-    record ConnectAccept(byte assignedClientId, int sessionId) implements PacketPayload {
+    record ConnectAccept(byte assignedClientId, int sessionId, long sessionToken) implements PacketPayload {
         @Override
         public byte[] toBytes() {
-            ByteBuffer buffer = ByteBuffer.allocate(1 + 4);
+            ByteBuffer buffer = ByteBuffer.allocate(1 + 4 + 8);
             buffer.order(ByteOrder.LITTLE_ENDIAN);
             buffer.put(assignedClientId);
             buffer.putInt(sessionId);
+            buffer.putLong(sessionToken);
             return buffer.array();
         }
 
         public static ConnectAccept fromBytes(byte[] bytes) {
             ByteBuffer buffer = ByteBuffer.wrap(bytes);
             buffer.order(ByteOrder.LITTLE_ENDIAN);
-            if (buffer.remaining() < 5) {
-                throw new IllegalArgumentException("Buffer underflow: not enough bytes for ConnectAccept (expected 5 bytes)");
+            if (buffer.remaining() < 13) {
+                throw new IllegalArgumentException("Buffer underflow: not enough bytes for ConnectAccept (expected 13 bytes)");
             }
             byte clientId = buffer.get();
             int sessionId = buffer.getInt();
             if (sessionId <= 0) {
                 throw new IllegalArgumentException("Session ID must be a positive integer, got: " + sessionId);
             }
-            return new ConnectAccept(clientId, sessionId);
+            long token = buffer.getLong();
+            return new ConnectAccept(clientId, sessionId, token);
         }
     }
 
@@ -335,6 +338,33 @@ public sealed interface PacketPayload permits
                 sequences.add(buffer.getShort());
             }
             return new Ack(sequences);
+        }
+    }
+
+    record ReconnectRequest(long sessionToken, int targetSessionId, byte previousClientId) implements PacketPayload {
+        @Override
+        public byte[] toBytes() {
+            ByteBuffer buffer = ByteBuffer.allocate(8 + 4 + 1);
+            buffer.order(ByteOrder.LITTLE_ENDIAN);
+            buffer.putLong(sessionToken);
+            buffer.putInt(targetSessionId);
+            buffer.put(previousClientId);
+            return buffer.array();
+        }
+
+        public static ReconnectRequest fromBytes(byte[] bytes) {
+            ByteBuffer buffer = ByteBuffer.wrap(bytes);
+            buffer.order(ByteOrder.LITTLE_ENDIAN);
+            if (buffer.remaining() < 13) {
+                throw new IllegalArgumentException("Buffer underflow: not enough bytes for ReconnectRequest (expected 13 bytes)");
+            }
+            long token = buffer.getLong();
+            int sessionId = buffer.getInt();
+            if (sessionId <= 0) {
+                throw new IllegalArgumentException("Session ID must be a positive integer, got: " + sessionId);
+            }
+            byte clientId = buffer.get();
+            return new ReconnectRequest(token, sessionId, clientId);
         }
     }
 
