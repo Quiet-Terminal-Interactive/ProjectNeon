@@ -23,6 +23,7 @@ public class NeonHost implements AutoCloseable {
     private static final int ACK_TIMEOUT_MS = 2000;
     private static final int MAX_ACK_RETRIES = 5;
     private static final long RELIABILITY_DELAY_MS = 50;
+    private static final int GRACEFUL_SHUTDOWN_TIMEOUT_MS = 2000;
 
     private final NeonSocket socket;
     private final int sessionId;
@@ -37,6 +38,7 @@ public class NeonHost implements AutoCloseable {
     private BiConsumer<String, String> clientDenyCallback; // (name, reason)
     private Consumer<Byte> pingReceivedCallback; // (fromClientId)
     private BiConsumer<Byte, Byte> unhandledPacketCallback; // (packetType, fromClientId)
+    private Consumer<Byte> clientDisconnectCallback; // (clientId)
 
     public NeonHost(int sessionId, String relayAddress) throws IOException {
         if (sessionId <= 0) {
@@ -110,6 +112,16 @@ public class NeonHost implements AutoCloseable {
                 for (Short seq : ack.acknowledgedSequences()) {
                     pendingAcks.values().removeIf(pending -> pending.sequence() == seq);
                 }
+            }
+            case PacketPayload.DisconnectNotice ignored -> {
+                byte disconnectedClientId = header.clientId();
+                connectedClients.remove(disconnectedClientId);
+                pendingAcks.remove(disconnectedClientId);
+                if (clientDisconnectCallback != null) {
+                    clientDisconnectCallback.accept(disconnectedClientId);
+                }
+                logger.log(Level.INFO, "Client {0} disconnected [SessionID={1}]",
+                    new Object[]{disconnectedClientId, sessionId});
             }
             default -> {
                 if (unhandledPacketCallback != null) {
@@ -238,8 +250,45 @@ public class NeonHost implements AutoCloseable {
         this.unhandledPacketCallback = callback;
     }
 
+    public void setClientDisconnectCallback(Consumer<Byte> callback) {
+        this.clientDisconnectCallback = callback;
+    }
+
     @Override
     public void close() throws IOException {
+        if (relayAddr != null) {
+            long shutdownStart = System.currentTimeMillis();
+
+            try {
+                PacketPayload.DisconnectNotice notice = new PacketPayload.DisconnectNotice();
+                NeonPacket packet = NeonPacket.create(
+                    PacketType.DISCONNECT_NOTICE, nextSequence++, HOST_CLIENT_ID, (byte) 0, notice
+                );
+                socket.sendPacket(packet, relayAddr);
+            } catch (IOException e) {
+                logger.log(Level.WARNING, "Failed to send disconnect notice [SessionID={0}]",
+                    new Object[]{sessionId});
+            }
+
+            while (!pendingAcks.isEmpty() &&
+                   System.currentTimeMillis() - shutdownStart < GRACEFUL_SHUTDOWN_TIMEOUT_MS) {
+                try {
+                    processPackets();
+                    Thread.sleep(10);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
+                } catch (IOException e) {
+                    logger.log(Level.WARNING, "Error during graceful shutdown [SessionID={0}]", sessionId);
+                    break;
+                }
+            }
+
+            if (!pendingAcks.isEmpty()) {
+                logger.log(Level.WARNING, "Graceful shutdown timeout: {0} pending ACKs remaining [SessionID={1}]",
+                    new Object[]{pendingAcks.size(), sessionId});
+            }
+        }
         socket.close();
     }
 

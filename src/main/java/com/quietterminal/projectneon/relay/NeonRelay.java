@@ -105,6 +105,7 @@ public class NeonRelay implements AutoCloseable {
         switch (packet.payload()) {
             case PacketPayload.ConnectRequest request -> handleConnectRequest(request, source);
             case PacketPayload.ConnectAccept accept -> handleConnectAccept(accept, source, header);
+            case PacketPayload.DisconnectNotice ignored -> handleDisconnectNotice(source, header);
             default -> {
                 routePacket(packet, source);
             }
@@ -190,6 +191,36 @@ public class NeonRelay implements AutoCloseable {
 
             routeToClient(sessionId, clientId, accept, header);
         }
+    }
+
+    private void handleDisconnectNotice(SocketAddress source, PacketHeader header) throws IOException {
+        Optional<Integer> sessionId = sessionManager.getSessionForPeer(source);
+        if (sessionId.isEmpty()) {
+            logger.log(Level.WARNING, "Disconnect notice from unknown peer {0}", source);
+            return;
+        }
+
+        byte clientId = header.clientId();
+        int session = sessionId.get();
+
+        PacketPayload.DisconnectNotice notice = new PacketPayload.DisconnectNotice();
+        NeonPacket noticePacket = NeonPacket.create(
+            PacketType.DISCONNECT_NOTICE, header.sequence(), clientId, (byte) 0, notice
+        );
+
+        List<PeerInfo> peers = sessionManager.getPeers(session);
+        for (PeerInfo peer : peers) {
+            if (!peer.addr().equals(source)) {
+                socket.sendPacket(noticePacket, peer.addr());
+            }
+        }
+
+        sessionManager.removePeer(source);
+        pendingConnections.remove(source);
+        rateLimiters.remove(source);
+
+        logger.log(Level.INFO, "Client {0} disconnected from session {1}",
+            new Object[]{clientId, session});
     }
 
     @SuppressWarnings("unused")
@@ -353,6 +384,20 @@ class SessionManager {
             if (peers != null) {
                 peers.removeIf(p -> p.addr().equals(addr));
                 peers.add(updated);
+            }
+        }
+    }
+
+    public void removePeer(SocketAddress addr) {
+        PeerInfo peer = peerLookup.remove(addr);
+        if (peer != null) {
+            List<PeerInfo> peers = sessions.get(peer.sessionId());
+            if (peers != null) {
+                peers.removeIf(p -> p.addr().equals(addr));
+                if (peers.isEmpty()) {
+                    sessions.remove(peer.sessionId());
+                    hosts.remove(peer.sessionId());
+                }
             }
         }
     }

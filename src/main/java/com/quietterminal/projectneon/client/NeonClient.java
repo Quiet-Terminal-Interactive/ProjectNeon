@@ -36,6 +36,7 @@ public class NeonClient implements AutoCloseable {
     private Consumer<PacketPayload.PacketTypeRegistry> packetTypeRegistryCallback;
     private BiConsumer<Byte, Byte> unhandledPacketCallback; // (packetType, fromClientId)
     private BiConsumer<Byte, Byte> wrongDestinationCallback; // (myId, packetDestinationId)
+    private Consumer<Byte> disconnectCallback; // (clientId)
 
     public NeonClient(String name) throws IOException {
         this.name = name;
@@ -160,6 +161,11 @@ public class NeonClient implements AutoCloseable {
             case PacketPayload.Ping ping -> {
                 sendPong(ping.timestamp());
             }
+            case PacketPayload.DisconnectNotice ignored -> {
+                if (disconnectCallback != null) {
+                    disconnectCallback.accept(header.clientId());
+                }
+            }
             default -> {
                 if (unhandledPacketCallback != null) {
                     unhandledPacketCallback.accept(header.packetType(), header.clientId());
@@ -251,8 +257,24 @@ public class NeonClient implements AutoCloseable {
         this.wrongDestinationCallback = callback;
     }
 
+    public void setDisconnectCallback(Consumer<Byte> callback) {
+        this.disconnectCallback = callback;
+    }
+
     @Override
     public void close() throws IOException {
+        if (clientId != null && relayAddr != null) {
+            try {
+                PacketPayload.DisconnectNotice notice = new PacketPayload.DisconnectNotice();
+                NeonPacket packet = NeonPacket.create(
+                    PacketType.DISCONNECT_NOTICE, nextSequence++, clientId, (byte) 0, notice
+                );
+                socket.sendPacket(packet, relayAddr);
+            } catch (IOException e) {
+                logger.log(Level.WARNING, "Failed to send disconnect notice [ClientID={0}, SessionID={1}]",
+                    new Object[]{clientId, sessionId});
+            }
+        }
         socket.close();
     }
 

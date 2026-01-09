@@ -134,15 +134,15 @@ Project Neon has a solid foundation with excellent architecture, but requires cr
 
 ### 4. Reliability & Connection Management
 
-#### 4.1 Disconnect Handling
-- [ ] Implement `DISCONNECT_NOTICE` packet sending:
+#### ~~4.1 Disconnect Handling~~ COMPLETE
+- [x] Implement `DISCONNECT_NOTICE` packet sending:
   - Send when `NeonClient.close()` is called
   - Send when `NeonHost.close()` is called
-- [ ] Process `DISCONNECT_NOTICE` on receive:
+- [x] Process `DISCONNECT_NOTICE` on receive:
   - Immediately remove client from relay
   - Trigger disconnect callback
   - Clean up resources
-- [ ] Add graceful shutdown timeout (wait for pending ACKs)
+- [x] Add graceful shutdown timeout (wait for pending ACKs)
 
 #### 4.2 Reconnection Support
 - [ ] Add reconnection logic to `NeonClient`:
