@@ -128,9 +128,14 @@ public class NeonHost implements AutoCloseable {
                 String clientName = connectedClients.remove(disconnectedClientId);
                 Long token = clientTokens.get(disconnectedClientId);
 
-                if (clientName != null && token != null) {
+                if (token != null) {
                     disconnectedClients.put(disconnectedClientId,
-                        new DisconnectedClient(clientName, token, System.currentTimeMillis()));
+                        new DisconnectedClient(clientName != null ? clientName : "", token, System.currentTimeMillis()));
+                    logger.log(Level.INFO, "Client {0} ({1}) added to disconnected clients for reconnection [SessionID={2}]",
+                        new Object[]{disconnectedClientId, clientName, sessionId});
+                } else {
+                    logger.log(Level.WARNING, "Client {0} disconnected but has no token, reconnection not possible [SessionID={1}]",
+                        new Object[]{disconnectedClientId, sessionId});
                 }
 
                 pendingAcks.remove(disconnectedClientId);

@@ -177,7 +177,8 @@ class PacketPayloadTest {
         void testSerializationRoundTrip() {
             PacketPayload.ConnectAccept original = new PacketPayload.ConnectAccept(
                 (byte) 5,
-                12345
+                12345,
+                0x123456789ABCDEFL
             );
 
             byte[] bytes = original.toBytes();
@@ -185,6 +186,7 @@ class PacketPayloadTest {
 
             assertEquals(original.assignedClientId(), deserialized.assignedClientId());
             assertEquals(original.sessionId(), deserialized.sessionId());
+            assertEquals(original.sessionToken(), deserialized.sessionToken());
         }
 
         @Test
@@ -192,7 +194,8 @@ class PacketPayloadTest {
         void testNegativeSessionId() {
             PacketPayload.ConnectAccept accept = new PacketPayload.ConnectAccept(
                 (byte) 1,
-                -1
+                -1,
+                0L
             );
 
             byte[] bytes = accept.toBytes();

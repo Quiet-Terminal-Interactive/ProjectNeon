@@ -183,14 +183,14 @@ public class NeonRelay implements AutoCloseable {
             sessionManager.registerHost(sessionId, source);
             System.out.println("Host registered for session " + sessionId + " from " + source);
         } else {
-            PendingConnection pending = findPendingBySessionId(sessionId);
-            if (pending != null) {
-                sessionManager.registerPeer(sessionId, clientId, source, false);
-                pendingConnections.remove(source);
+            SocketAddress clientAddr = findPendingClientAddress(sessionId);
+            if (clientAddr != null) {
+                sessionManager.registerPeer(sessionId, clientId, clientAddr, false);
+                pendingConnections.remove(clientAddr);
                 System.out.println("Client " + clientId + " joined session " + sessionId);
-            }
 
-            routeToClient(sessionId, clientId, accept, header);
+                routeToClient(sessionId, clientId, accept, header);
+            }
         }
     }
 
@@ -295,10 +295,10 @@ public class NeonRelay implements AutoCloseable {
         }
     }
 
-    private PendingConnection findPendingBySessionId(int sessionId) {
-        for (PendingConnection pending : pendingConnections.values()) {
-            if (pending.sessionId() == sessionId) {
-                return pending;
+    private SocketAddress findPendingClientAddress(int sessionId) {
+        for (Map.Entry<SocketAddress, PendingConnection> entry : pendingConnections.entrySet()) {
+            if (entry.getValue().sessionId() == sessionId) {
+                return entry.getKey();
             }
         }
         return null;

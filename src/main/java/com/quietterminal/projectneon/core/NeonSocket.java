@@ -135,6 +135,10 @@ public class NeonSocket implements AutoCloseable {
         socket.close();
     }
 
+    public boolean isClosed() {
+        return socket.isClosed();
+    }
+
     /**
      * Helper record for received raw packets.
      */

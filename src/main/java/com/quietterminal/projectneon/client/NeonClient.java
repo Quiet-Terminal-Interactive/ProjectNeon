@@ -23,7 +23,7 @@ public class NeonClient implements AutoCloseable {
     private static final int INITIAL_RECONNECT_DELAY_MS = 1000;
     private static final int MAX_RECONNECT_DELAY_MS = 30000;
 
-    private final NeonSocket socket;
+    private NeonSocket socket;
     private final String name;
     private SocketAddress relayAddr;
     private Byte clientId;
@@ -291,6 +291,12 @@ public class NeonClient implements AutoCloseable {
     }
 
     private boolean attemptReconnect() throws IOException {
+        // Create new socket if the previous one was closed
+        if (socket.isClosed()) {
+            socket = new NeonSocket();
+            socket.setBlocking(true);
+        }
+
         socket.setSoTimeout(CONNECTION_TIMEOUT_MS);
 
         PacketPayload.ReconnectRequest request = new PacketPayload.ReconnectRequest(
