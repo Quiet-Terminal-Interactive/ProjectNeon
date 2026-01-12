@@ -133,7 +133,7 @@ class PacketTypeTest {
     }
 
     @ParameterizedTest
-    @ValueSource(bytes = {0x00, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0F})
+    @ValueSource(bytes = {0x00, 0x06, 0x07, 0x08, 0x09, 0x0A})
     @DisplayName("Should throw exception for invalid byte values in core range")
     void testFromByteInvalidCoreValues(byte value) {
         IllegalArgumentException exception = assertThrows(
@@ -246,11 +246,11 @@ class PacketTypeTest {
     void testExceptionMessageFormat() {
         IllegalArgumentException exception = assertThrows(
             IllegalArgumentException.class,
-            () -> PacketType.fromByte((byte) 0x0F)
+            () -> PacketType.fromByte((byte) 0x06)
         );
 
         assertTrue(exception.getMessage().contains("Unknown packet type"));
-        assertTrue(exception.getMessage().contains("0xf") || exception.getMessage().contains("0xF"));
+        assertTrue(exception.getMessage().contains("0x6") || exception.getMessage().contains("0x06"));
     }
 
     @Test

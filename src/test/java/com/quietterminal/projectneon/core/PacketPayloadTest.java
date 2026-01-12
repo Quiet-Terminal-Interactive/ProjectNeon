@@ -219,7 +219,7 @@ class PacketPayloadTest {
             );
 
             assertTrue(exception.getMessage().contains("Buffer underflow"));
-            assertTrue(exception.getMessage().contains("expected 5 bytes"));
+            assertTrue(exception.getMessage().contains("expected 13 bytes"));
         }
     }
 

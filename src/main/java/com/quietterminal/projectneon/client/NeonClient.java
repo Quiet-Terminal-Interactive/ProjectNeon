@@ -372,9 +372,13 @@ public class NeonClient implements AutoCloseable {
                     PacketType.DISCONNECT_NOTICE, nextSequence++, clientId, (byte) 0, notice
                 );
                 socket.sendPacket(packet, relayAddr);
+                // Give the packet time to be sent before closing the socket
+                Thread.sleep(50);
             } catch (IOException e) {
                 logger.log(Level.WARNING, "Failed to send disconnect notice [ClientID={0}, SessionID={1}]",
                     new Object[]{clientId, sessionId});
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
             }
         }
         socket.close();
