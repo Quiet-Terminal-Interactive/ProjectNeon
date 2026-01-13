@@ -168,20 +168,31 @@ Project Neon has a solid foundation with excellent architecture, but requires cr
 
 ---
 
-### 5. JNI Implementation
-- [ ] Implement `src/main/native/neon_jni.c`:
-  - JVM initialization and lifecycle
-  - Handle creation/destruction functions
-  - Callback marshalling (C → Java)
-  - Error handling and reporting
-  - Thread safety for callbacks
-- [ ] Build native library for all platforms:
+### ~~5. JNI Implementation~~ COMPLETE
+- [x] Implement `src/main/native/neon_jni.c`:
+  - JVM initialization and lifecycle (JNI_OnLoad/JNI_OnUnload)
+  - Handle creation/destruction functions for client and host
+  - Callback marshalling (C function pointers stored in handles)
+  - Error handling and reporting (thread-local error buffers)
+  - Thread safety for callbacks (automatic JVM thread attachment)
+- [x] Build native library for all platforms:
+  - Created `CMakeLists.txt` for cross-platform builds
   - Linux: `libneon_jni.so`
   - macOS: `libneon_jni.dylib`
   - Windows: `neon_jni.dll`
-- [ ] Test JNI layer with example C programs
-- [ ] Update build documentation
-- [ ] Add JNI test to CI pipeline
+- [x] Test JNI layer with example C programs:
+  - Created `examples/client_example.c` - Full client integration demo
+  - Created `examples/host_example.c` - Full host integration demo
+  - Both examples demonstrate callbacks, packet processing, lifecycle
+- [x] Update build documentation:
+  - Created `BUILD.md` - Comprehensive build instructions
+  - Created `INTEGRATION.md` - Game engine integration guide (Unreal, Unity)
+  - Created `examples/README.md` - Example usage documentation
+- [x] Add JNI test to CI pipeline:
+  - Added `jni-build` job for multi-platform builds (Windows, Linux, macOS)
+  - Added `jni-examples` job to build and verify example programs
+  - Automatic artifact uploads for all platforms
+  - Integrated with existing GitHub Actions workflow
 
 ---
 
@@ -266,6 +277,25 @@ Project Neon has a solid foundation with excellent architecture, but requires cr
   - Latency (p50, p95, p99)
   - Throughput (packets/second)
   - Memory usage per connection
+
+---
+
+### 9.5. Some stuff I missed before that I got bullied into adding
+
+- [ ] Full-size receive buffers + enforcement
+- [ ] Honest relay semantics
+- [ ] Unsealed payload architecture
+- [ ] Centralized ACK state machine
+- [ ] Event-driven receive loop (no sleep polling)
+- [ ] Game packet registry + subtype/version/validation
+- [ ] Core metrics
+- [ ] Runtime configuration
+- [ ] Payload size enforcement
+- [ ] Explicit version mismatch handling
+- [ ] Clean start/stop lifecycle
+- [ ] Transport interface
+- [ ] Structured logging
+- [ ] Better backpressure signals
 
 ---
 
