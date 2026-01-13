@@ -1,7 +1,10 @@
 package com.quietterminal.projectneon.util;
 
+import java.text.MessageFormat;
+import java.text.NumberFormat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.Locale;
 import java.util.logging.Formatter;
 import java.util.logging.LogRecord;
 
@@ -21,7 +24,9 @@ public class NeonLogFormatter extends Formatter {
         sb.append(' ');
         sb.append(record.getLevel().getName());
         sb.append("]: ");
-        sb.append(formatMessage(record));
+
+        String message = formatMessageWithoutCommas(record);
+        sb.append(message);
         sb.append('\n');
 
         if (record.getThrown() != null) {
@@ -36,5 +41,29 @@ public class NeonLogFormatter extends Formatter {
         }
 
         return sb.toString();
+    }
+
+    /**
+     * Formats the log message without locale-specific number formatting (no commas).
+     */
+    private String formatMessageWithoutCommas(LogRecord record) {
+        String message = record.getMessage();
+        Object[] params = record.getParameters();
+
+        if (params == null || params.length == 0) {
+            return message;
+        }
+
+        MessageFormat formatter = new MessageFormat(message, Locale.ROOT);
+
+        java.text.Format[] formats = formatter.getFormatsByArgumentIndex();
+        for (int i = 0; i < formats.length; i++) {
+            if (formats[i] instanceof NumberFormat) {
+                NumberFormat nf = (NumberFormat) formats[i];
+                nf.setGroupingUsed(false);
+            }
+        }
+
+        return formatter.format(params);
     }
 }
