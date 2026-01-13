@@ -1,5 +1,7 @@
 package com.quietterminal.projectneon.relay;
 
+import com.quietterminal.projectneon.util.LoggerConfig;
+
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -7,7 +9,12 @@ import java.util.logging.Logger;
  * CLI entry point for the Neon relay server.
  */
 public class RelayMain {
-    private static final Logger logger = Logger.getLogger(RelayMain.class.getName());
+    private static final Logger logger;
+
+    static {
+        logger = Logger.getLogger(RelayMain.class.getName());
+        LoggerConfig.configureLogger(logger);
+    }
     private static final String DEFAULT_BIND_ADDRESS = "0.0.0.0:7777";
 
     public static void main(String[] args) {

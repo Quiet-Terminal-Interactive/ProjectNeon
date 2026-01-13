@@ -1,5 +1,7 @@
 package com.quietterminal.projectneon.host;
 
+import com.quietterminal.projectneon.util.LoggerConfig;
+
 import java.util.Random;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -8,7 +10,12 @@ import java.util.logging.Logger;
  * CLI entry point for the Neon host.
  */
 public class HostMain {
-    private static final Logger logger = Logger.getLogger(HostMain.class.getName());
+    private static final Logger logger;
+
+    static {
+        logger = Logger.getLogger(HostMain.class.getName());
+        LoggerConfig.configureLogger(logger);
+    }
 
     public static void main(String[] args) {
         try {

@@ -1,6 +1,7 @@
 package com.quietterminal.projectneon.client;
 
 import com.quietterminal.projectneon.core.PacketPayload;
+import com.quietterminal.projectneon.util.LoggerConfig;
 
 import java.util.Scanner;
 import java.util.logging.Level;
@@ -10,7 +11,12 @@ import java.util.logging.Logger;
  * CLI entry point for the Neon client.
  */
 public class ClientMain {
-    private static final Logger logger = Logger.getLogger(ClientMain.class.getName());
+    private static final Logger logger;
+
+    static {
+        logger = Logger.getLogger(ClientMain.class.getName());
+        LoggerConfig.configureLogger(logger);
+    }
 
     public static void main(String[] args) {
         try (Scanner scanner = new Scanner(System.in)) {

@@ -94,20 +94,22 @@ public class ReconnectionTest {
 
         Thread.sleep(SETUP_DELAY_MS);
 
-        // Simulate disconnect by closing the client's socket (network failure)
-        // The client retains session state but loses connection
         client.close();
         Thread.sleep(SETUP_DELAY_MS);
 
-        // Process disconnect on host
         for (int i = 0; i < 5; i++) {
             host.processPackets();
             Thread.sleep(20);
         }
 
-        // Now reconnect
         assertTrue(client.reconnect(3),
             "Client should successfully reconnect");
+
+        Thread.sleep(SETUP_DELAY_MS);
+        for (int i = 0; i < 5; i++) {
+            host.processPackets();
+            Thread.sleep(20);
+        }
 
         assertEquals(originalClientId, client.getClientId().orElseThrow(),
             "Client ID should remain the same after reconnection");
@@ -161,6 +163,17 @@ public class ReconnectionTest {
 
         Thread.sleep(SETUP_DELAY_MS);
 
+        client.close();
+        Thread.sleep(SETUP_DELAY_MS);
+
+        for (int i = 0; i < 5; i++) {
+            host.processPackets();
+            Thread.sleep(20);
+        }
+
+        host.close();
+        Thread.sleep(SETUP_DELAY_MS);
+
         long startTime = System.currentTimeMillis();
         client.reconnect(3);
         long elapsed = System.currentTimeMillis() - startTime;
@@ -169,9 +182,6 @@ public class ReconnectionTest {
             "Should take at least 3 seconds with exponential backoff (1s + 2s)");
         assertTrue(elapsed < 8000,
             "Should not take more than 8 seconds");
-
-        client.close();
-        host.close();
     }
 
     @Test
@@ -187,23 +197,27 @@ public class ReconnectionTest {
         });
         Thread.sleep(SETUP_DELAY_MS);
 
+        CountDownLatch initialConnectLatch = new CountDownLatch(1);
         CountDownLatch reconnectLatch = new CountDownLatch(1);
-        AtomicInteger reconnectedClientId = new AtomicInteger(-1);
+        AtomicInteger connectCallCount = new AtomicInteger(0);
 
         host.setClientConnectCallback((clientId, name, sessionId) -> {
-            if (reconnectedClientId.get() != -1 && reconnectedClientId.get() == clientId) {
+            int count = connectCallCount.incrementAndGet();
+            if (count == 1) {
+                initialConnectLatch.countDown();
+            } else if (count == 2) {
                 reconnectLatch.countDown();
             }
         });
 
         NeonClient client = new NeonClient("TestClient");
         assertTrue(client.connect(TEST_SESSION_ID, RELAY_ADDRESS));
-        byte clientId = client.getClientId().orElseThrow();
-        reconnectedClientId.set(clientId);
+
+        assertTrue(initialConnectLatch.await(1, TimeUnit.SECONDS),
+            "Initial connection should trigger callback");
 
         Thread.sleep(SETUP_DELAY_MS);
 
-        // Disconnect first
         client.close();
         Thread.sleep(SETUP_DELAY_MS);
 
@@ -212,12 +226,11 @@ public class ReconnectionTest {
             Thread.sleep(20);
         }
 
-        // Now reconnect
         assertTrue(client.reconnect(3));
 
         Thread.sleep(SETUP_DELAY_MS);
 
-        for (int i = 0; i < 5; i++) {
+        for (int i = 0; i < 10; i++) {
             host.processPackets();
             Thread.sleep(20);
         }
@@ -256,7 +269,6 @@ public class ReconnectionTest {
 
         Thread.sleep(SETUP_DELAY_MS);
 
-        // Disconnect client1 first
         client1.close();
         Thread.sleep(SETUP_DELAY_MS);
 
@@ -265,8 +277,13 @@ public class ReconnectionTest {
             Thread.sleep(20);
         }
 
-        // Reconnect client1
         assertTrue(client1.reconnect(3));
+
+        Thread.sleep(SETUP_DELAY_MS);
+        for (int i = 0; i < 5; i++) {
+            host.processPackets();
+            Thread.sleep(20);
+        }
 
         assertEquals(client1Id, client1.getClientId().orElseThrow(),
             "Client 1 should keep same ID after reconnection");

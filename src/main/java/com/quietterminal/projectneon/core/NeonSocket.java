@@ -1,5 +1,7 @@
 package com.quietterminal.projectneon.core;
 
+import com.quietterminal.projectneon.util.LoggerConfig;
+
 import java.io.IOException;
 import java.net.*;
 import java.nio.BufferUnderflowException;
@@ -12,7 +14,12 @@ import java.util.logging.Logger;
  * Supports both blocking and non-blocking modes.
  */
 public class NeonSocket implements AutoCloseable {
-    private static final Logger logger = Logger.getLogger(NeonSocket.class.getName());
+    private static final Logger logger;
+
+    static {
+        logger = Logger.getLogger(NeonSocket.class.getName());
+        LoggerConfig.configureLogger(logger);
+    }
     private static final int BUFFER_SIZE = 1024;
     private final DatagramChannel channel;
     private final DatagramSocket socket;
@@ -33,7 +40,7 @@ public class NeonSocket implements AutoCloseable {
         this.socket = channel.socket();
         this.socket.bind(new InetSocketAddress(port));
         this.receiveBuffer = new byte[BUFFER_SIZE];
-        setBlocking(false); // Default to non-blocking
+        setBlocking(false);
     }
 
     /**

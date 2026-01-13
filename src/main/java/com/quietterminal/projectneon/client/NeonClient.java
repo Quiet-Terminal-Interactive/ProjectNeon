@@ -1,6 +1,7 @@
 package com.quietterminal.projectneon.client;
 
 import com.quietterminal.projectneon.core.*;
+import com.quietterminal.projectneon.util.LoggerConfig;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -16,7 +17,12 @@ import java.util.logging.Logger;
  * Neon protocol client implementation.
  */
 public class NeonClient implements AutoCloseable {
-    private static final Logger logger = Logger.getLogger(NeonClient.class.getName());
+    private static final Logger logger;
+
+    static {
+        logger = Logger.getLogger(NeonClient.class.getName());
+        LoggerConfig.configureLogger(logger);
+    }
     private static final long DEFAULT_PING_INTERVAL_MS = 5000;
     private static final int CONNECTION_TIMEOUT_MS = 10000;
     private static final int MAX_RECONNECT_ATTEMPTS = 5;
@@ -46,7 +52,7 @@ public class NeonClient implements AutoCloseable {
         this.name = name;
         this.socket = new NeonSocket();
         this.socket.setBlocking(true);
-        this.socket.setSoTimeout(100); // 100ms timeout for responsive processing
+        this.socket.setSoTimeout(100);
     }
 
     /**
@@ -68,7 +74,7 @@ public class NeonClient implements AutoCloseable {
         socket.setSoTimeout(CONNECTION_TIMEOUT_MS);
 
         PacketPayload.ConnectRequest request = new PacketPayload.ConnectRequest(
-            PacketHeader.VERSION, name, sessionId, 0 // game_identifier unused for now
+            PacketHeader.VERSION, name, sessionId, 0
         );
         NeonPacket packet = NeonPacket.create(
             PacketType.CONNECT_REQUEST, nextSequence++, (byte) 0, (byte) 1, request
@@ -103,7 +109,7 @@ public class NeonClient implements AutoCloseable {
                 }
             }
         } catch (IOException e) {
-            socket.setSoTimeout(100); // Reset to normal processing timeout
+            socket.setSoTimeout(100);
             throw e;
         }
     }
@@ -253,6 +259,12 @@ public class NeonClient implements AutoCloseable {
             return false;
         }
 
+        if (!socket.isClosed()) {
+            logger.log(Level.WARNING, "Cannot reconnect: socket is still open [SessionID={0}, ClientID={1}]",
+                new Object[]{sessionId, clientId});
+            return false;
+        }
+
         int attempt = 0;
         int delayMs = INITIAL_RECONNECT_DELAY_MS;
 
@@ -291,7 +303,6 @@ public class NeonClient implements AutoCloseable {
     }
 
     private boolean attemptReconnect() throws IOException {
-        // Create new socket if the previous one was closed
         if (socket.isClosed()) {
             socket = new NeonSocket();
             socket.setBlocking(true);
@@ -372,7 +383,6 @@ public class NeonClient implements AutoCloseable {
                     PacketType.DISCONNECT_NOTICE, nextSequence++, clientId, (byte) 0, notice
                 );
                 socket.sendPacket(packet, relayAddr);
-                // Give the packet time to be sent before closing the socket
                 Thread.sleep(50);
             } catch (IOException e) {
                 logger.log(Level.WARNING, "Failed to send disconnect notice [ClientID={0}, SessionID={1}]",

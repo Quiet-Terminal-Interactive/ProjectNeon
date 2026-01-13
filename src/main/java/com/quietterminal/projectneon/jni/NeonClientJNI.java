@@ -1,5 +1,7 @@
 package com.quietterminal.projectneon.jni;
 
+import com.quietterminal.projectneon.util.LoggerConfig;
+
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -10,7 +12,12 @@ import java.util.logging.Logger;
  * for game engine integration (Unreal, Unity, custom engines).
  */
 public class NeonClientJNI {
-    private static final Logger logger = Logger.getLogger(NeonClientJNI.class.getName());
+    private static final Logger logger;
+
+    static {
+        logger = Logger.getLogger(NeonClientJNI.class.getName());
+        LoggerConfig.configureLogger(logger);
+    }
 
     static {
         try {

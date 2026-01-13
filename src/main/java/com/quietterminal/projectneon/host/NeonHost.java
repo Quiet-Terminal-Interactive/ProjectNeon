@@ -1,6 +1,7 @@
 package com.quietterminal.projectneon.host;
 
 import com.quietterminal.projectneon.core.*;
+import com.quietterminal.projectneon.util.LoggerConfig;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -17,7 +18,12 @@ import java.util.logging.Logger;
  * The host manages game sessions and coordinates clients through a relay.
  */
 public class NeonHost implements AutoCloseable {
-    private static final Logger logger = Logger.getLogger(NeonHost.class.getName());
+    private static final Logger logger;
+
+    static {
+        logger = Logger.getLogger(NeonHost.class.getName());
+        LoggerConfig.configureLogger(logger);
+    }
     private static final byte HOST_CLIENT_ID = 1;
     private static final byte FIRST_CLIENT_ID = 2;
     private static final int ACK_TIMEOUT_MS = 2000;
@@ -51,7 +57,7 @@ public class NeonHost implements AutoCloseable {
         this.sessionId = sessionId;
         this.socket = new NeonSocket();
         this.socket.setBlocking(true);
-        this.socket.setSoTimeout(100); // 100ms timeout for responsive processing
+        this.socket.setSoTimeout(100);
 
         String[] parts = relayAddress.split(":");
         if (parts.length != 2) {
@@ -243,7 +249,7 @@ public class NeonHost implements AutoCloseable {
 
         PacketPayload.ConnectAccept accept = new PacketPayload.ConnectAccept(clientId, sessionId, newToken);
         NeonPacket acceptPacket = NeonPacket.create(
-            PacketType.CONNECT_ACCEPT, nextSequence++, HOST_CLIENT_ID, (byte) 0, accept
+            PacketType.CONNECT_ACCEPT, nextSequence++, HOST_CLIENT_ID, clientId, accept
         );
         socket.sendPacket(acceptPacket, relayAddr);
 

@@ -1,5 +1,7 @@
 package com.quietterminal.projectneon.core;
 
+import com.quietterminal.projectneon.util.LoggerConfig;
+
 import java.io.IOException;
 import java.net.SocketAddress;
 import java.util.*;
@@ -24,7 +26,12 @@ import java.util.logging.Logger;
  * }</pre>
  */
 public class ReliablePacketManager {
-    private static final Logger logger = Logger.getLogger(ReliablePacketManager.class.getName());
+    private static final Logger logger;
+
+    static {
+        logger = Logger.getLogger(ReliablePacketManager.class.getName());
+        LoggerConfig.configureLogger(logger);
+    }
     private static final int DEFAULT_TIMEOUT_MS = 2000;
     private static final int DEFAULT_MAX_RETRIES = 5;
 

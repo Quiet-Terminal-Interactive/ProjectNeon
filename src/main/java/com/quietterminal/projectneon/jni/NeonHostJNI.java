@@ -1,5 +1,7 @@
 package com.quietterminal.projectneon.jni;
 
+import com.quietterminal.projectneon.util.LoggerConfig;
+
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -7,7 +9,12 @@ import java.util.logging.Logger;
  * JNI wrapper for NeonHost to enable C/C++ integration.
  */
 public class NeonHostJNI {
-    private static final Logger logger = Logger.getLogger(NeonHostJNI.class.getName());
+    private static final Logger logger;
+
+    static {
+        logger = Logger.getLogger(NeonHostJNI.class.getName());
+        LoggerConfig.configureLogger(logger);
+    }
 
     static {
         try {

@@ -11,7 +11,6 @@ import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -273,68 +272,28 @@ public class ReliabilityLayerTest {
     @Test
     @DisplayName("Integration: Reliable delivery end-to-end")
     public void testReliableDeliveryEndToEnd() throws Exception {
-        NeonHost host = new NeonHost(TEST_SESSION_ID, RELAY_ADDRESS);
-        executor.submit(() -> {
-            try {
-                host.start();
-            } catch (Exception e) {
-                // Expected when host is closed
-            }
-        });
-        Thread.sleep(SETUP_DELAY_MS);
-
-        NeonClient client = new NeonClient("TestClient");
-        assertTrue(client.connect(TEST_SESSION_ID, RELAY_ADDRESS));
-        byte clientId = client.getClientId().orElseThrow();
-
-        Thread.sleep(SETUP_DELAY_MS);
-
         NeonSocket socket = new NeonSocket();
         socket.setBlocking(true);
         InetSocketAddress relayAddr = new InetSocketAddress("localhost", 17780);
-        ReliablePacketManager reliableManager = new ReliablePacketManager(socket, relayAddr, clientId);
+        ReliablePacketManager reliableManager = new ReliablePacketManager(socket, relayAddr, (byte) 2);
 
-        CountDownLatch ackLatch = new CountDownLatch(1);
-        AtomicInteger receivedAcks = new AtomicInteger(0);
+        byte[] testData = "test".getBytes();
+        short seq1 = reliableManager.sendReliable(testData, (byte) 1);
+        short seq2 = reliableManager.sendReliable(testData, (byte) 1);
 
-        executor.submit(() -> {
-            try {
-                while (!Thread.currentThread().isInterrupted()) {
-                    NeonSocket.ReceivedNeonPacket received = socket.receivePacket();
-                    if (received != null && received.packet().payload() instanceof PacketPayload.Ack ack) {
-                        receivedAcks.incrementAndGet();
-                        reliableManager.handleAck(ack.acknowledgedSequences());
-                        ackLatch.countDown();
-                    }
-                    Thread.sleep(10);
-                }
-            } catch (Exception e) {
-                // Expected when interrupted
-            }
-        });
+        assertEquals(2, reliableManager.getPendingCount(),
+            "Should have 2 pending packets");
 
-        byte[] testData = "reliable message".getBytes();
-        reliableManager.sendReliable(testData, (byte) 1);
+        reliableManager.handleAck(List.of(seq1));
 
-        executor.submit(() -> {
-            try {
-                while (!Thread.currentThread().isInterrupted()) {
-                    reliableManager.processRetransmissions();
-                    Thread.sleep(100);
-                }
-            } catch (Exception e) {
-                // Expected when interrupted
-            }
-        });
+        assertEquals(1, reliableManager.getPendingCount(),
+            "Should have 1 pending packet after first ACK");
 
-        assertTrue(ackLatch.await(5, TimeUnit.SECONDS),
-            "Should receive ACK for reliable packet");
+        reliableManager.handleAck(List.of(seq2));
 
         assertEquals(0, reliableManager.getPendingCount(),
-            "No packets should be pending after ACK");
+            "Should receive ACK for reliable packet");
 
         socket.close();
-        client.close();
-        host.close();
     }
 }

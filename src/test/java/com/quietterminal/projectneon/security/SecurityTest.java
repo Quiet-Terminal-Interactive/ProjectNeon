@@ -249,8 +249,6 @@ class SecurityTest {
                 Thread.sleep(10);
             }
 
-            // Second client may or may not connect (implementation-dependent)
-            // Just verify the system doesn't crash
             try {
                 client2.connect(TEST_SESSION_ID, RELAY_ADDRESS);
             } catch (Exception e) {

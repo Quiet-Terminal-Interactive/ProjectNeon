@@ -1,6 +1,7 @@
 package com.quietterminal.projectneon.relay;
 
 import com.quietterminal.projectneon.core.*;
+import com.quietterminal.projectneon.util.LoggerConfig;
 
 import java.io.IOException;
 import java.net.SocketAddress;
@@ -15,7 +16,12 @@ import java.util.logging.Logger;
  * Routes packets between hosts and clients in a completely payload-agnostic manner.
  */
 public class NeonRelay implements AutoCloseable {
-    private static final Logger logger = Logger.getLogger(NeonRelay.class.getName());
+    private static final Logger logger;
+
+    static {
+        logger = Logger.getLogger(NeonRelay.class.getName());
+        LoggerConfig.configureLogger(logger);
+    }
     private static final int DEFAULT_PORT = 7777;
     private static final long CLEANUP_INTERVAL_MS = 5000;
     private static final long CLIENT_TIMEOUT_MS = 15000;
@@ -37,7 +43,7 @@ public class NeonRelay implements AutoCloseable {
 
         this.socket = new NeonSocket(port);
         this.socket.setBlocking(true);
-        this.socket.setSoTimeout(100); // 100ms timeout for responsive processing
+        this.socket.setSoTimeout(100);
         this.sessionManager = new SessionManager();
         this.pendingConnections = new ConcurrentHashMap<>();
         this.rateLimiters = new ConcurrentHashMap<>();
@@ -188,9 +194,9 @@ public class NeonRelay implements AutoCloseable {
                 sessionManager.registerPeer(sessionId, clientId, clientAddr, false);
                 pendingConnections.remove(clientAddr);
                 System.out.println("Client " + clientId + " joined session " + sessionId);
-
-                routeToClient(sessionId, clientId, accept, header);
             }
+
+            routeToClient(sessionId, clientId, accept, header);
         }
     }
 
@@ -205,7 +211,7 @@ public class NeonRelay implements AutoCloseable {
             NeonPacket forwardPacket = new NeonPacket(header, request);
             socket.sendPacket(forwardPacket, hostAddr.get());
 
-            sessionManager.registerPeer(sessionId, request.previousClientId(), source, false);
+            sessionManager.updatePeerAddress(sessionId, request.previousClientId(), source);
             logger.log(Level.INFO, "Reconnect request forwarded for client {0} [SessionID={1}]",
                 new Object[]{request.previousClientId(), sessionId});
         } else {
@@ -362,6 +368,25 @@ class SessionManager {
         peerLookup.put(addr, peer);
     }
 
+    public void updatePeerAddress(int sessionId, byte clientId, SocketAddress newAddr) {
+        List<PeerInfo> peers = sessions.get(sessionId);
+        if (peers != null) {
+            PeerInfo oldPeer = peers.stream()
+                .filter(p -> p.clientId() == clientId)
+                .findFirst()
+                .orElse(null);
+
+            if (oldPeer != null) {
+                peers.remove(oldPeer);
+                peerLookup.remove(oldPeer.addr());
+            }
+
+            PeerInfo newPeer = new PeerInfo(newAddr, clientId, sessionId, Instant.now(), oldPeer != null && oldPeer.isHost());
+            peers.add(newPeer);
+            peerLookup.put(newAddr, newPeer);
+        }
+    }
+
     public Optional<SocketAddress> getHost(int sessionId) {
         return Optional.ofNullable(hosts.get(sessionId));
     }
@@ -473,6 +498,13 @@ record PeerInfo(
  * Tracks violations and implements progressive throttling for repeat offenders.
  */
 class RateLimiter {
+    private static final Logger logger;
+
+    static {
+        logger = Logger.getLogger(RateLimiter.class.getName());
+        com.quietterminal.projectneon.util.LoggerConfig.configureLogger(logger);
+    }
+
     private static final int FLOOD_THRESHOLD = 3;
     private static final long FLOOD_WINDOW_MS = 10000;
     private static final int THROTTLE_PENALTY_DIVISOR = 2;
@@ -531,7 +563,7 @@ class RateLimiter {
 
             if (violationCount >= FLOOD_THRESHOLD && !isThrottled) {
                 isThrottled = true;
-                Logger.getLogger(RateLimiter.class.getName()).log(Level.WARNING,
+                logger.log(Level.WARNING,
                     "Flood detected: throttling activated after {0} violations", violationCount);
             }
         }
