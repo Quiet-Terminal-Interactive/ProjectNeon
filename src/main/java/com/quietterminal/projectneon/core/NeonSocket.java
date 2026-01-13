@@ -20,26 +20,47 @@ public class NeonSocket implements AutoCloseable {
         logger = Logger.getLogger(NeonSocket.class.getName());
         LoggerConfig.configureLogger(logger);
     }
-    private static final int BUFFER_SIZE = 1024;
+
     private final DatagramChannel channel;
     private final DatagramSocket socket;
     private final byte[] receiveBuffer;
 
+    @SuppressWarnings("unused")
+    private final NeonConfig config;
+
     /**
-     * Creates a new UDP socket bound to any available port.
+     * Creates a new UDP socket bound to any available port with default configuration.
      */
     public NeonSocket() throws IOException {
-        this(0); // Bind to any available port
+        this(0, new NeonConfig());
     }
 
     /**
-     * Creates a new UDP socket bound to the specified port.
+     * Creates a new UDP socket bound to any available port with custom configuration.
+     */
+    public NeonSocket(NeonConfig config) throws IOException {
+        this(0, config);
+    }
+
+    /**
+     * Creates a new UDP socket bound to the specified port with default configuration.
      */
     public NeonSocket(int port) throws IOException {
+        this(port, new NeonConfig());
+    }
+
+    /**
+     * Creates a new UDP socket bound to the specified port with custom configuration.
+     */
+    public NeonSocket(int port, NeonConfig config) throws IOException {
+        if (config == null) {
+            throw new IllegalArgumentException("config cannot be null");
+        }
+        this.config = config;
         this.channel = DatagramChannel.open();
         this.socket = channel.socket();
         this.socket.bind(new InetSocketAddress(port));
-        this.receiveBuffer = new byte[BUFFER_SIZE];
+        this.receiveBuffer = new byte[config.getBufferSize()];
         setBlocking(false);
     }
 

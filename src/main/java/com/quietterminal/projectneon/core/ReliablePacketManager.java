@@ -32,31 +32,50 @@ public class ReliablePacketManager {
         logger = Logger.getLogger(ReliablePacketManager.class.getName());
         LoggerConfig.configureLogger(logger);
     }
-    private static final int DEFAULT_TIMEOUT_MS = 2000;
-    private static final int DEFAULT_MAX_RETRIES = 5;
 
     private final NeonSocket socket;
     private final SocketAddress relayAddr;
     private final byte clientId;
     private short nextReliableSequence = 0;
 
+    @SuppressWarnings("unused")
+    private final NeonConfig config;
+
     private final Map<Short, PendingReliablePacket> pendingPackets = new ConcurrentHashMap<>();
     private final Map<Byte, Short> lastReceivedSequence = new ConcurrentHashMap<>();
 
-    private int timeoutMs = DEFAULT_TIMEOUT_MS;
-    private int maxRetries = DEFAULT_MAX_RETRIES;
+    private int timeoutMs;
+    private int maxRetries;
 
     /**
-     * Creates a new reliable packet manager.
+     * Creates a new reliable packet manager with default configuration.
      *
      * @param socket The socket to send packets through
      * @param relayAddr The relay address
      * @param clientId This client's ID
      */
     public ReliablePacketManager(NeonSocket socket, SocketAddress relayAddr, byte clientId) {
+        this(socket, relayAddr, clientId, new NeonConfig());
+    }
+
+    /**
+     * Creates a new reliable packet manager with custom configuration.
+     *
+     * @param socket The socket to send packets through
+     * @param relayAddr The relay address
+     * @param clientId This client's ID
+     * @param config The configuration to use
+     */
+    public ReliablePacketManager(NeonSocket socket, SocketAddress relayAddr, byte clientId, NeonConfig config) {
+        if (config == null) {
+            throw new IllegalArgumentException("config cannot be null");
+        }
         this.socket = socket;
         this.relayAddr = relayAddr;
         this.clientId = clientId;
+        this.config = config;
+        this.timeoutMs = config.getReliablePacketTimeoutMs();
+        this.maxRetries = config.getReliablePacketMaxRetries();
     }
 
     /**

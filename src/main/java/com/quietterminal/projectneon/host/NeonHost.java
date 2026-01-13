@@ -24,15 +24,12 @@ public class NeonHost implements AutoCloseable {
         logger = Logger.getLogger(NeonHost.class.getName());
         LoggerConfig.configureLogger(logger);
     }
+
     private static final byte HOST_CLIENT_ID = 1;
     private static final byte FIRST_CLIENT_ID = 2;
-    private static final int ACK_TIMEOUT_MS = 2000;
-    private static final int MAX_ACK_RETRIES = 5;
-    private static final long RELIABILITY_DELAY_MS = 50;
-    private static final int GRACEFUL_SHUTDOWN_TIMEOUT_MS = 2000;
-    private static final long SESSION_TOKEN_TIMEOUT_MS = 300000;
 
     private final NeonSocket socket;
+    private final NeonConfig config;
     private final int sessionId;
     private SocketAddress relayAddr;
     private byte nextClientId = FIRST_CLIENT_ID;
@@ -44,20 +41,36 @@ public class NeonHost implements AutoCloseable {
     private final Map<Byte, DisconnectedClient> disconnectedClients = new ConcurrentHashMap<>();
     private final java.security.SecureRandom secureRandom = new java.security.SecureRandom();
 
-    private TriConsumer<Byte, String, Integer> clientConnectCallback; // (clientId, name, sessionId)
-    private BiConsumer<String, String> clientDenyCallback; // (name, reason)
-    private Consumer<Byte> pingReceivedCallback; // (fromClientId)
-    private BiConsumer<Byte, Byte> unhandledPacketCallback; // (packetType, fromClientId)
-    private Consumer<Byte> clientDisconnectCallback; // (clientId)
+    private TriConsumer<Byte, String, Integer> clientConnectCallback;
+    private BiConsumer<String, String> clientDenyCallback;
+    private Consumer<Byte> pingReceivedCallback;
+    private BiConsumer<Byte, Byte> unhandledPacketCallback;
+    private Consumer<Byte> clientDisconnectCallback;
 
+    /**
+     * Creates a host with default configuration.
+     */
     public NeonHost(int sessionId, String relayAddress) throws IOException {
+        this(sessionId, relayAddress, new NeonConfig());
+    }
+
+    /**
+     * Creates a host with custom configuration.
+     */
+    public NeonHost(int sessionId, String relayAddress, NeonConfig config) throws IOException {
         if (sessionId <= 0) {
             throw new IllegalArgumentException("Session ID must be a positive integer, got: " + sessionId);
         }
+        if (config == null) {
+            throw new IllegalArgumentException("config cannot be null");
+        }
+        config.validate();
+
         this.sessionId = sessionId;
-        this.socket = new NeonSocket();
+        this.config = config;
+        this.socket = new NeonSocket(config);
         this.socket.setBlocking(true);
-        this.socket.setSoTimeout(100);
+        this.socket.setSoTimeout(config.getHostSocketTimeoutMs());
 
         String[] parts = relayAddress.split(":");
         if (parts.length != 2) {
@@ -89,7 +102,7 @@ public class NeonHost implements AutoCloseable {
         while (true) {
             processPackets();
             checkPendingAcks();
-            Thread.sleep(10);
+            Thread.sleep(config.getHostProcessingLoopSleepMs());
         }
     }
 
@@ -187,7 +200,7 @@ public class NeonHost implements AutoCloseable {
         }
 
         try {
-            Thread.sleep(RELIABILITY_DELAY_MS);
+            Thread.sleep(config.getHostReliabilityDelayMs());
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
@@ -232,7 +245,7 @@ public class NeonHost implements AutoCloseable {
         }
 
         long now = System.currentTimeMillis();
-        if (now - disconnected.disconnectTime() > SESSION_TOKEN_TIMEOUT_MS) {
+        if (now - disconnected.disconnectTime() > config.getHostSessionTokenTimeoutMs()) {
             disconnectedClients.remove(clientId);
             sendConnectDeny("", "Session timeout exceeded");
             logger.log(Level.WARNING, "Reconnect attempt after timeout for client {0} [SessionID={1}]",
@@ -284,10 +297,10 @@ public class NeonHost implements AutoCloseable {
         for (Map.Entry<Byte, PendingAck> entry : pendingAcks.entrySet()) {
             PendingAck pending = entry.getValue();
 
-            if (now - pending.lastSentTime() >= ACK_TIMEOUT_MS) {
-                if (pending.retryCount() >= MAX_ACK_RETRIES) {
+            if (now - pending.lastSentTime() >= config.getHostAckTimeoutMs()) {
+                if (pending.retryCount() >= config.getHostMaxAckRetries()) {
                     logger.log(Level.WARNING, "Client {0} failed to ACK after {1} retries [SessionID={2}, Sequence={3}]",
-                        new Object[]{pending.clientId(), MAX_ACK_RETRIES, sessionId, pending.sequence()});
+                        new Object[]{pending.clientId(), config.getHostMaxAckRetries(), sessionId, pending.sequence()});
                     toRemove.add(entry.getKey());
                 } else {
                     socket.sendPacket(pending.packet(), relayAddr);
@@ -351,10 +364,10 @@ public class NeonHost implements AutoCloseable {
             }
 
             while (!pendingAcks.isEmpty() &&
-                   System.currentTimeMillis() - shutdownStart < GRACEFUL_SHUTDOWN_TIMEOUT_MS) {
+                   System.currentTimeMillis() - shutdownStart < config.getHostGracefulShutdownTimeoutMs()) {
                 try {
                     processPackets();
-                    Thread.sleep(10);
+                    Thread.sleep(config.getHostProcessingLoopSleepMs());
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     break;

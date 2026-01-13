@@ -22,28 +22,38 @@ public class NeonRelay implements AutoCloseable {
         logger = Logger.getLogger(NeonRelay.class.getName());
         LoggerConfig.configureLogger(logger);
     }
-    private static final int DEFAULT_PORT = 7777;
-    private static final long CLEANUP_INTERVAL_MS = 5000;
-    private static final long CLIENT_TIMEOUT_MS = 15000;
-    private static final int MAX_PACKETS_PER_SECOND = 100;
-    private static final int MAX_CLIENTS_PER_SESSION = 32;
-    private static final int MAX_TOTAL_CONNECTIONS = 1000;
-    private static final int MAX_PENDING_CONNECTIONS = 100;
-    private static final int MAX_RATE_LIMITERS = 2000;
 
     private final NeonSocket socket;
     private final SessionManager sessionManager;
     private final Map<SocketAddress, PendingConnection> pendingConnections;
     private final Map<SocketAddress, RateLimiter> rateLimiters;
+    private final NeonConfig config;
     private long lastCleanupTime;
 
+    /**
+     * Creates a relay with default configuration.
+     */
     public NeonRelay(String bindAddress) throws IOException {
-        String[] parts = bindAddress.split(":");
-        int port = parts.length == 2 ? Integer.parseInt(parts[1]) : DEFAULT_PORT;
+        this(bindAddress, new NeonConfig());
+    }
 
-        this.socket = new NeonSocket(port);
+    /**
+     * Creates a relay with custom configuration.
+     */
+    public NeonRelay(String bindAddress, NeonConfig config) throws IOException {
+        if (config == null) {
+            throw new IllegalArgumentException("config cannot be null");
+        }
+        config.validate();
+
+        this.config = config;
+
+        String[] parts = bindAddress.split(":");
+        int port = parts.length == 2 ? Integer.parseInt(parts[1]) : config.getRelayPort();
+
+        this.socket = new NeonSocket(port, config);
         this.socket.setBlocking(true);
-        this.socket.setSoTimeout(100);
+        this.socket.setSoTimeout(config.getRelaySocketTimeoutMs());
         this.sessionManager = new SessionManager();
         this.pendingConnections = new ConcurrentHashMap<>();
         this.rateLimiters = new ConcurrentHashMap<>();
@@ -59,7 +69,7 @@ public class NeonRelay implements AutoCloseable {
         while (true) {
             processPackets();
             performCleanup();
-            Thread.sleep(1);
+            Thread.sleep(config.getRelayMainLoopSleepMs());
         }
     }
 
@@ -83,13 +93,13 @@ public class NeonRelay implements AutoCloseable {
     }
 
     private void handlePacket(NeonPacket packet, SocketAddress source) throws IOException {
-        if (!rateLimiters.containsKey(source) && rateLimiters.size() >= MAX_RATE_LIMITERS) {
+        if (!rateLimiters.containsKey(source) && rateLimiters.size() >= config.getMaxRateLimiters()) {
             logger.log(Level.WARNING, "Rate limiter capacity exceeded for {0} - dropping packet", source);
             return;
         }
 
         RateLimiter limiter = rateLimiters.computeIfAbsent(source,
-            k -> new RateLimiter(MAX_PACKETS_PER_SECOND));
+            k -> new RateLimiter(config.getMaxPacketsPerSecond(), config));
 
         if (!limiter.allowPacket()) {
             if (limiter.isThrottled()) {
@@ -123,7 +133,7 @@ public class NeonRelay implements AutoCloseable {
         int sessionId = request.targetSessionId();
 
         int totalConnections = sessionManager.getTotalConnections();
-        if (totalConnections >= MAX_TOTAL_CONNECTIONS) {
+        if (totalConnections >= config.getMaxTotalConnections()) {
             PacketPayload.ConnectDeny deny = new PacketPayload.ConnectDeny("Relay is full");
             PacketHeader header = PacketHeader.create(
                 PacketType.CONNECT_DENY.getValue(), (short) 0, (byte) 0, (byte) 0
@@ -131,12 +141,12 @@ public class NeonRelay implements AutoCloseable {
             NeonPacket denyPacket = new NeonPacket(header, deny);
             socket.sendPacket(denyPacket, source);
             logger.log(Level.WARNING, "Connection denied for {0}: relay is full ({1}/{2}) [SessionID={3}]",
-                new Object[]{source, totalConnections, MAX_TOTAL_CONNECTIONS, sessionId});
+                new Object[]{source, totalConnections, config.getMaxTotalConnections(), sessionId});
             return;
         }
 
         int currentClients = sessionManager.getClientCount(sessionId);
-        if (currentClients >= MAX_CLIENTS_PER_SESSION) {
+        if (currentClients >= config.getMaxClientsPerSession()) {
             PacketPayload.ConnectDeny deny = new PacketPayload.ConnectDeny("Session is full");
             PacketHeader header = PacketHeader.create(
                 PacketType.CONNECT_DENY.getValue(), (short) 0, (byte) 0, (byte) 0
@@ -144,11 +154,11 @@ public class NeonRelay implements AutoCloseable {
             NeonPacket denyPacket = new NeonPacket(header, deny);
             socket.sendPacket(denyPacket, source);
             logger.log(Level.WARNING, "Connection denied for {0}: session {1} is full ({2}/{3})",
-                new Object[]{source, sessionId, currentClients, MAX_CLIENTS_PER_SESSION});
+                new Object[]{source, sessionId, currentClients, config.getMaxClientsPerSession()});
             return;
         }
 
-        if (pendingConnections.size() >= MAX_PENDING_CONNECTIONS) {
+        if (pendingConnections.size() >= config.getMaxPendingConnections()) {
             PacketPayload.ConnectDeny deny = new PacketPayload.ConnectDeny("Too many pending connections");
             PacketHeader header = PacketHeader.create(
                 PacketType.CONNECT_DENY.getValue(), (short) 0, (byte) 0, (byte) 0
@@ -156,7 +166,7 @@ public class NeonRelay implements AutoCloseable {
             NeonPacket denyPacket = new NeonPacket(header, deny);
             socket.sendPacket(denyPacket, source);
             logger.log(Level.WARNING, "Connection denied for {0}: pending connections queue full ({1}/{2}) [SessionID={3}]",
-                new Object[]{source, pendingConnections.size(), MAX_PENDING_CONNECTIONS, sessionId});
+                new Object[]{source, pendingConnections.size(), config.getMaxPendingConnections(), sessionId});
             return;
         }
 
@@ -312,13 +322,13 @@ public class NeonRelay implements AutoCloseable {
 
     private void performCleanup() {
         long now = System.currentTimeMillis();
-        if (now - lastCleanupTime < CLEANUP_INTERVAL_MS) {
+        if (now - lastCleanupTime < config.getRelayCleanupIntervalMs()) {
             return;
         }
 
-        sessionManager.cleanupStale(CLIENT_TIMEOUT_MS);
+        sessionManager.cleanupStale(config.getRelayClientTimeoutMs());
 
-        Instant pendingCutoff = Instant.now().minusMillis(30000);
+        Instant pendingCutoff = Instant.now().minusMillis(config.getRelayPendingConnectionTimeoutMs());
         pendingConnections.entrySet().removeIf(entry -> {
             if (entry.getValue().requestTime().isBefore(pendingCutoff)) {
                 System.out.println("Cleaned up stale pending connection: " + entry.getKey());
@@ -505,11 +515,8 @@ class RateLimiter {
         com.quietterminal.projectneon.util.LoggerConfig.configureLogger(logger);
     }
 
-    private static final int FLOOD_THRESHOLD = 3;
-    private static final long FLOOD_WINDOW_MS = 10000;
-    private static final int THROTTLE_PENALTY_DIVISOR = 2;
-
     private final int maxPacketsPerSecond;
+    private final NeonConfig config;
     private int tokens;
     private long lastRefillTime;
 
@@ -517,8 +524,9 @@ class RateLimiter {
     private long firstViolationTime;
     private boolean isThrottled;
 
-    public RateLimiter(int maxPacketsPerSecond) {
+    public RateLimiter(int maxPacketsPerSecond, NeonConfig config) {
         this.maxPacketsPerSecond = maxPacketsPerSecond;
+        this.config = config;
         this.tokens = maxPacketsPerSecond;
         this.lastRefillTime = System.currentTimeMillis();
         this.violationCount = 0;
@@ -530,7 +538,7 @@ class RateLimiter {
         refillTokens();
         checkFloodStatus();
 
-        int effectiveLimit = isThrottled ? maxPacketsPerSecond / THROTTLE_PENALTY_DIVISOR : maxPacketsPerSecond;
+        int effectiveLimit = isThrottled ? maxPacketsPerSecond / config.getThrottlePenaltyDivisor() : maxPacketsPerSecond;
 
         if (tokens > 0 && tokens <= effectiveLimit) {
             tokens--;
@@ -545,7 +553,7 @@ class RateLimiter {
         long now = System.currentTimeMillis();
         long timePassed = now - lastRefillTime;
 
-        if (timePassed >= 1000) {
+        if (timePassed >= config.getTokenRefillIntervalMs()) {
             int tokensToAdd = (int) (timePassed / 1000) * maxPacketsPerSecond;
             tokens = Math.min(maxPacketsPerSecond, tokens + tokensToAdd);
             lastRefillTime = now;
@@ -555,13 +563,13 @@ class RateLimiter {
     private void recordViolation() {
         long now = System.currentTimeMillis();
 
-        if (firstViolationTime == 0 || now - firstViolationTime > FLOOD_WINDOW_MS) {
+        if (firstViolationTime == 0 || now - firstViolationTime > config.getFloodWindowMs()) {
             firstViolationTime = now;
             violationCount = 1;
         } else {
             violationCount++;
 
-            if (violationCount >= FLOOD_THRESHOLD && !isThrottled) {
+            if (violationCount >= config.getFloodThreshold() && !isThrottled) {
                 isThrottled = true;
                 logger.log(Level.WARNING,
                     "Flood detected: throttling activated after {0} violations", violationCount);
@@ -572,7 +580,7 @@ class RateLimiter {
     private void checkFloodStatus() {
         long now = System.currentTimeMillis();
 
-        if (isThrottled && now - firstViolationTime > FLOOD_WINDOW_MS) {
+        if (isThrottled && now - firstViolationTime > config.getFloodWindowMs()) {
             isThrottled = false;
             violationCount = 0;
             firstViolationTime = 0;

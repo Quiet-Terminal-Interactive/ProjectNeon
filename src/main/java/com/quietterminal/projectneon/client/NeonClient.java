@@ -23,13 +23,9 @@ public class NeonClient implements AutoCloseable {
         logger = Logger.getLogger(NeonClient.class.getName());
         LoggerConfig.configureLogger(logger);
     }
-    private static final long DEFAULT_PING_INTERVAL_MS = 5000;
-    private static final int CONNECTION_TIMEOUT_MS = 10000;
-    private static final int MAX_RECONNECT_ATTEMPTS = 5;
-    private static final int INITIAL_RECONNECT_DELAY_MS = 1000;
-    private static final int MAX_RECONNECT_DELAY_MS = 30000;
 
     private NeonSocket socket;
+    private final NeonConfig config;
     private final String name;
     private SocketAddress relayAddr;
     private Byte clientId;
@@ -38,21 +34,38 @@ public class NeonClient implements AutoCloseable {
     private short nextSequence = 0;
 
     private boolean autoPing = true;
-    private long pingIntervalMs = DEFAULT_PING_INTERVAL_MS;
+    private long pingIntervalMs;
     private long lastPingTime = 0;
 
-    private BiConsumer<Long, Long> pongCallback; // (responseTimeMs, originalTimestamp)
-    private TriConsumer<Byte, Short, Short> sessionConfigCallback; // (version, tickRate, maxPacketSize)
+    private BiConsumer<Long, Long> pongCallback;
+    private TriConsumer<Byte, Short, Short> sessionConfigCallback;
     private Consumer<PacketPayload.PacketTypeRegistry> packetTypeRegistryCallback;
-    private BiConsumer<Byte, Byte> unhandledPacketCallback; // (packetType, fromClientId)
-    private BiConsumer<Byte, Byte> wrongDestinationCallback; // (myId, packetDestinationId)
-    private Consumer<Byte> disconnectCallback; // (clientId)
+    private BiConsumer<Byte, Byte> unhandledPacketCallback;
+    private BiConsumer<Byte, Byte> wrongDestinationCallback;
+    private Consumer<Byte> disconnectCallback;
 
+    /**
+     * Creates a client with default configuration.
+     */
     public NeonClient(String name) throws IOException {
+        this(name, new NeonConfig());
+    }
+
+    /**
+     * Creates a client with custom configuration.
+     */
+    public NeonClient(String name, NeonConfig config) throws IOException {
+        if (config == null) {
+            throw new IllegalArgumentException("config cannot be null");
+        }
+        config.validate();
+
         this.name = name;
-        this.socket = new NeonSocket();
+        this.config = config;
+        this.socket = new NeonSocket(config);
         this.socket.setBlocking(true);
-        this.socket.setSoTimeout(100);
+        this.socket.setSoTimeout(config.getClientSocketTimeoutMs());
+        this.pingIntervalMs = config.getClientPingIntervalMs();
     }
 
     /**
@@ -71,7 +84,7 @@ public class NeonClient implements AutoCloseable {
         this.relayAddr = new InetSocketAddress(host, port);
         this.sessionId = sessionId;
 
-        socket.setSoTimeout(CONNECTION_TIMEOUT_MS);
+        socket.setSoTimeout(config.getClientConnectionTimeoutMs());
 
         PacketPayload.ConnectRequest request = new PacketPayload.ConnectRequest(
             PacketHeader.VERSION, name, sessionId, 0
@@ -96,7 +109,7 @@ public class NeonClient implements AutoCloseable {
                     );
                     socket.sendPacket(confirmation, relayAddr);
 
-                    socket.setSoTimeout(100);
+                    socket.setSoTimeout(config.getClientSocketTimeoutMs());
                     logger.log(Level.INFO, "Connected to session {0} as client {1} [Token={2}]",
                         new Object[]{sessionId, clientId, sessionToken});
                     return true;
@@ -109,7 +122,7 @@ public class NeonClient implements AutoCloseable {
                 }
             }
         } catch (IOException e) {
-            socket.setSoTimeout(100);
+            socket.setSoTimeout(config.getClientSocketTimeoutMs());
             throw e;
         }
     }
@@ -226,7 +239,7 @@ public class NeonClient implements AutoCloseable {
     public void run() throws IOException, InterruptedException {
         while (true) {
             processPackets();
-            Thread.sleep(10);
+            Thread.sleep(config.getClientProcessingLoopSleepMs());
         }
     }
 
@@ -266,7 +279,7 @@ public class NeonClient implements AutoCloseable {
         }
 
         int attempt = 0;
-        int delayMs = INITIAL_RECONNECT_DELAY_MS;
+        int delayMs = config.getClientInitialReconnectDelayMs();
 
         while (attempt < maxAttempts) {
             attempt++;
@@ -286,7 +299,7 @@ public class NeonClient implements AutoCloseable {
 
             if (attempt < maxAttempts) {
                 Thread.sleep(delayMs);
-                delayMs = Math.min(delayMs * 2, MAX_RECONNECT_DELAY_MS);
+                delayMs = Math.min(delayMs * 2, config.getClientMaxReconnectDelayMs());
             }
         }
 
@@ -299,16 +312,16 @@ public class NeonClient implements AutoCloseable {
      * Attempts to reconnect using default max attempts.
      */
     public boolean reconnect() throws IOException, InterruptedException {
-        return reconnect(MAX_RECONNECT_ATTEMPTS);
+        return reconnect(config.getClientMaxReconnectAttempts());
     }
 
     private boolean attemptReconnect() throws IOException {
         if (socket.isClosed()) {
-            socket = new NeonSocket();
+            socket = new NeonSocket(config);
             socket.setBlocking(true);
         }
 
-        socket.setSoTimeout(CONNECTION_TIMEOUT_MS);
+        socket.setSoTimeout(config.getClientConnectionTimeoutMs());
 
         PacketPayload.ReconnectRequest request = new PacketPayload.ReconnectRequest(
             sessionToken, sessionId, clientId
@@ -320,13 +333,13 @@ public class NeonClient implements AutoCloseable {
 
         try {
             long startTime = System.currentTimeMillis();
-            while (System.currentTimeMillis() - startTime < CONNECTION_TIMEOUT_MS) {
+            while (System.currentTimeMillis() - startTime < config.getClientConnectionTimeoutMs()) {
                 NeonSocket.ReceivedNeonPacket received = socket.receivePacket();
                 if (received == null) continue;
 
                 if (received.packet().payload() instanceof PacketPayload.ConnectAccept accept) {
                     this.sessionToken = accept.sessionToken();
-                    socket.setSoTimeout(100);
+                    socket.setSoTimeout(config.getClientSocketTimeoutMs());
                     return true;
                 }
 
@@ -338,7 +351,7 @@ public class NeonClient implements AutoCloseable {
             }
             return false;
         } finally {
-            socket.setSoTimeout(100);
+            socket.setSoTimeout(config.getClientSocketTimeoutMs());
         }
     }
 
@@ -383,7 +396,7 @@ public class NeonClient implements AutoCloseable {
                     PacketType.DISCONNECT_NOTICE, nextSequence++, clientId, (byte) 0, notice
                 );
                 socket.sendPacket(packet, relayAddr);
-                Thread.sleep(50);
+                Thread.sleep(config.getClientDisconnectNoticeDelayMs());
             } catch (IOException e) {
                 logger.log(Level.WARNING, "Failed to send disconnect notice [ClientID={0}, SessionID={1}]",
                     new Object[]{clientId, sessionId});

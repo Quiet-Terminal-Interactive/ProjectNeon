@@ -359,6 +359,86 @@ try (NeonHost host = new NeonHost(12345, "127.0.0.1:7777")) {
 }
 ```
 
+### Configuration
+
+Project Neon provides comprehensive configuration options through the `NeonConfig` class. All timing values are in milliseconds, and all size values are in bytes.
+
+**Creating a Custom Configuration:**
+
+```java
+import com.quietterminal.projectneon.core.NeonConfig;
+
+NeonConfig config = new NeonConfig()
+    .setClientPingIntervalMs(3000)           // Send pings every 3 seconds
+    .setClientConnectionTimeoutMs(15000)     // 15 second connection timeout
+    .setHostAckTimeoutMs(1000)               // 1 second ACK timeout
+    .setMaxClientsPerSession(64)             // Allow up to 64 clients per session
+    .setBufferSize(2048);                    // 2KB receive buffer
+
+config.validate();  // Validate all values before using
+
+// Use with client
+NeonClient client = new NeonClient("PlayerName", config);
+
+// Use with host
+NeonHost host = new NeonHost(12345, "127.0.0.1:7777", config);
+
+// Use with relay
+NeonRelay relay = new NeonRelay("0.0.0.0:7777", config);
+```
+
+**Configuration Categories:**
+
+| Category | Parameters | Default | Description |
+|----------|-----------|---------|-------------|
+| **Socket** | `bufferSize` | 1024 bytes | UDP receive buffer size |
+| **Client** | `clientPingIntervalMs` | 5000 ms | How often to send keep-alive pings |
+| | `clientConnectionTimeoutMs` | 10000 ms | Timeout for connection attempts |
+| | `clientMaxReconnectAttempts` | 5 | Maximum automatic reconnection tries |
+| | `clientInitialReconnectDelayMs` | 1000 ms | Initial reconnection backoff |
+| | `clientMaxReconnectDelayMs` | 30000 ms | Maximum reconnection backoff |
+| | `clientSocketTimeoutMs` | 100 ms | Non-blocking socket timeout |
+| | `clientProcessingLoopSleepMs` | 10 ms | Main loop sleep interval |
+| | `clientDisconnectNoticeDelayMs` | 50 ms | Delay before disconnect notice |
+| **Host** | `hostAckTimeoutMs` | 2000 ms | Timeout before retransmitting |
+| | `hostMaxAckRetries` | 5 | Maximum retransmission attempts |
+| | `hostReliabilityDelayMs` | 50 ms | Delay before sending session config |
+| | `hostGracefulShutdownTimeoutMs` | 2000 ms | Max time to wait for pending ACKs |
+| | `hostSessionTokenTimeoutMs` | 300000 ms | Reconnection window (5 minutes) |
+| | `hostSocketTimeoutMs` | 100 ms | Non-blocking socket timeout |
+| | `hostProcessingLoopSleepMs` | 10 ms | Main loop sleep interval |
+| **Relay** | `relayPort` | 7777 | Default relay server port |
+| | `relayCleanupIntervalMs` | 5000 ms | Session cleanup interval |
+| | `relayClientTimeoutMs` | 15000 ms | Stale client cleanup timeout |
+| | `relaySocketTimeoutMs` | 100 ms | Non-blocking socket timeout |
+| | `relayMainLoopSleepMs` | 1 ms | Main loop sleep interval |
+| | `relayPendingConnectionTimeoutMs` | 30000 ms | Pending connection timeout |
+| **Limits** | `maxPacketsPerSecond` | 100 | Rate limit per client |
+| | `maxClientsPerSession` | 32 | Maximum clients per session |
+| | `maxTotalConnections` | 1000 | Maximum total relay connections |
+| | `maxPendingConnections` | 100 | Maximum pending connections |
+| | `maxRateLimiters` | 2000 | Maximum rate limiter instances |
+| **Rate Limiting** | `floodThreshold` | 3 | Violations before throttling |
+| | `floodWindowMs` | 10000 ms | Flood detection time window |
+| | `throttlePenaltyDivisor` | 2 | Rate reduction factor when throttled |
+| | `tokenRefillIntervalMs` | 1000 ms | Token bucket refill interval |
+| **Reliable Packets** | `reliablePacketTimeoutMs` | 2000 ms | Timeout for reliable packets |
+| | `reliablePacketMaxRetries` | 5 | Max retries for reliable packets |
+| **Protocol Limits** | `maxNameLength` | 64 chars | Maximum name length (protocol) |
+| | `maxDescriptionLength` | 256 chars | Maximum description length |
+| | `maxPacketCount` | 100 | Maximum packet types/ACKs per packet |
+| | `maxPayloadSize` | 65507 bytes | Maximum UDP payload size |
+
+**Tuning Recommendations:**
+
+- **Fast-paced games on reliable networks:** Lower timeouts (clientPingIntervalMs: 2000, hostAckTimeoutMs: 1000)
+- **Turn-based games or unreliable networks:** Higher timeouts (clientPingIntervalMs: 10000, hostAckTimeoutMs: 5000)
+- **High-bandwidth data transfer:** Larger buffers (bufferSize: 4096 or 8192)
+- **Public servers:** Stricter rate limits (maxPacketsPerSecond: 50, maxClientsPerSession: 16)
+- **Private/LAN servers:** Relaxed limits (maxPacketsPerSecond: 200, maxClientsPerSession: 128)
+
+**Note:** Protocol limit parameters (`maxNameLength`, `maxDescriptionLength`, `maxPacketCount`, `maxPayloadSize`) are part of the wire format specification and should generally not be changed as they ensure protocol compatibility.
+
 ### C/C++ Integration via JNI
 
 For integrating with C/C++ applications (Unreal Engine, Unity, custom engines):
