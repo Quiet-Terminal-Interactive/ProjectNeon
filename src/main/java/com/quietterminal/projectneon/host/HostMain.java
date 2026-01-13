@@ -8,8 +8,9 @@ import java.util.logging.Logger;
 
 /**
  * CLI entry point for the Neon host.
+ * This class is internal and not part of the public API.
  */
-public class HostMain {
+class HostMain {
     private static final Logger logger;
 
     static {

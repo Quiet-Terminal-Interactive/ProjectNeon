@@ -9,8 +9,9 @@ import java.util.logging.Logger;
 
 /**
  * CLI entry point for the Neon client.
+ * This class is internal and not part of the public API.
  */
-public class ClientMain {
+class ClientMain {
     private static final Logger logger;
 
     static {

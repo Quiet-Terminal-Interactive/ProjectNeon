@@ -7,8 +7,9 @@ import java.util.logging.Logger;
 
 /**
  * CLI entry point for the Neon relay server.
+ * This class is internal and not part of the public API.
  */
-public class RelayMain {
+class RelayMain {
     private static final Logger logger;
 
     static {

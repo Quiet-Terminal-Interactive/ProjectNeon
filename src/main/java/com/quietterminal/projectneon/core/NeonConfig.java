@@ -1,5 +1,7 @@
 package com.quietterminal.projectneon.core;
 
+import com.quietterminal.projectneon.PublicAPI;
+
 /**
  * Configuration class for Project Neon networking parameters.
  * All timing values are in milliseconds, all size values are in bytes.
@@ -13,8 +15,18 @@ package com.quietterminal.projectneon.core;
  *   <li>Stricter rate limits for public servers</li>
  * </ul>
  *
+ * <p>Configuration can be created using:
+ * <ul>
+ *   <li>Default constructor with fluent setters: {@code new NeonConfig().setBufferSize(2048)...}</li>
+ *   <li>Builder pattern: {@code NeonConfig.builder().bufferSize(2048)...build()}</li>
+ * </ul>
+ *
+ * <p>Thread safety: This class is not thread-safe. Create and configure instances before
+ * passing to Neon components. Once passed to a component, configuration should not be modified.
+ *
  * @since 1.0
  */
+@PublicAPI
 public class NeonConfig {
 
     private int bufferSize = 1024;
@@ -526,5 +538,225 @@ public class NeonConfig {
     public NeonConfig setMaxPayloadSize(int maxPayloadSize) {
         this.maxPayloadSize = maxPayloadSize;
         return this;
+    }
+
+    /**
+     * Creates a new builder for constructing NeonConfig instances.
+     *
+     * @return a new Builder instance
+     * @since 1.0
+     */
+    public static Builder builder() {
+        return new Builder();
+    }
+
+    /**
+     * Builder class for creating NeonConfig instances with a fluent API.
+     *
+     * @since 1.0
+     */
+    @PublicAPI
+    public static class Builder {
+        private final NeonConfig config = new NeonConfig();
+
+        private Builder() {
+        }
+
+        public Builder bufferSize(int bufferSize) {
+            config.setBufferSize(bufferSize);
+            return this;
+        }
+
+        public Builder relayPort(int relayPort) {
+            config.setRelayPort(relayPort);
+            return this;
+        }
+
+        public Builder relayCleanupIntervalMs(int relayCleanupIntervalMs) {
+            config.setRelayCleanupIntervalMs(relayCleanupIntervalMs);
+            return this;
+        }
+
+        public Builder relayClientTimeoutMs(int relayClientTimeoutMs) {
+            config.setRelayClientTimeoutMs(relayClientTimeoutMs);
+            return this;
+        }
+
+        public Builder relaySocketTimeoutMs(int relaySocketTimeoutMs) {
+            config.setRelaySocketTimeoutMs(relaySocketTimeoutMs);
+            return this;
+        }
+
+        public Builder relayMainLoopSleepMs(int relayMainLoopSleepMs) {
+            config.setRelayMainLoopSleepMs(relayMainLoopSleepMs);
+            return this;
+        }
+
+        public Builder relayPendingConnectionTimeoutMs(int relayPendingConnectionTimeoutMs) {
+            config.setRelayPendingConnectionTimeoutMs(relayPendingConnectionTimeoutMs);
+            return this;
+        }
+
+        public Builder maxPacketsPerSecond(int maxPacketsPerSecond) {
+            config.setMaxPacketsPerSecond(maxPacketsPerSecond);
+            return this;
+        }
+
+        public Builder maxClientsPerSession(int maxClientsPerSession) {
+            config.setMaxClientsPerSession(maxClientsPerSession);
+            return this;
+        }
+
+        public Builder maxTotalConnections(int maxTotalConnections) {
+            config.setMaxTotalConnections(maxTotalConnections);
+            return this;
+        }
+
+        public Builder maxPendingConnections(int maxPendingConnections) {
+            config.setMaxPendingConnections(maxPendingConnections);
+            return this;
+        }
+
+        public Builder maxRateLimiters(int maxRateLimiters) {
+            config.setMaxRateLimiters(maxRateLimiters);
+            return this;
+        }
+
+        public Builder floodThreshold(int floodThreshold) {
+            config.setFloodThreshold(floodThreshold);
+            return this;
+        }
+
+        public Builder floodWindowMs(int floodWindowMs) {
+            config.setFloodWindowMs(floodWindowMs);
+            return this;
+        }
+
+        public Builder throttlePenaltyDivisor(int throttlePenaltyDivisor) {
+            config.setThrottlePenaltyDivisor(throttlePenaltyDivisor);
+            return this;
+        }
+
+        public Builder tokenRefillIntervalMs(int tokenRefillIntervalMs) {
+            config.setTokenRefillIntervalMs(tokenRefillIntervalMs);
+            return this;
+        }
+
+        public Builder hostAckTimeoutMs(int hostAckTimeoutMs) {
+            config.setHostAckTimeoutMs(hostAckTimeoutMs);
+            return this;
+        }
+
+        public Builder hostMaxAckRetries(int hostMaxAckRetries) {
+            config.setHostMaxAckRetries(hostMaxAckRetries);
+            return this;
+        }
+
+        public Builder hostReliabilityDelayMs(int hostReliabilityDelayMs) {
+            config.setHostReliabilityDelayMs(hostReliabilityDelayMs);
+            return this;
+        }
+
+        public Builder hostGracefulShutdownTimeoutMs(int hostGracefulShutdownTimeoutMs) {
+            config.setHostGracefulShutdownTimeoutMs(hostGracefulShutdownTimeoutMs);
+            return this;
+        }
+
+        public Builder hostSessionTokenTimeoutMs(int hostSessionTokenTimeoutMs) {
+            config.setHostSessionTokenTimeoutMs(hostSessionTokenTimeoutMs);
+            return this;
+        }
+
+        public Builder hostSocketTimeoutMs(int hostSocketTimeoutMs) {
+            config.setHostSocketTimeoutMs(hostSocketTimeoutMs);
+            return this;
+        }
+
+        public Builder hostProcessingLoopSleepMs(int hostProcessingLoopSleepMs) {
+            config.setHostProcessingLoopSleepMs(hostProcessingLoopSleepMs);
+            return this;
+        }
+
+        public Builder clientPingIntervalMs(int clientPingIntervalMs) {
+            config.setClientPingIntervalMs(clientPingIntervalMs);
+            return this;
+        }
+
+        public Builder clientConnectionTimeoutMs(int clientConnectionTimeoutMs) {
+            config.setClientConnectionTimeoutMs(clientConnectionTimeoutMs);
+            return this;
+        }
+
+        public Builder clientMaxReconnectAttempts(int clientMaxReconnectAttempts) {
+            config.setClientMaxReconnectAttempts(clientMaxReconnectAttempts);
+            return this;
+        }
+
+        public Builder clientInitialReconnectDelayMs(int clientInitialReconnectDelayMs) {
+            config.setClientInitialReconnectDelayMs(clientInitialReconnectDelayMs);
+            return this;
+        }
+
+        public Builder clientMaxReconnectDelayMs(int clientMaxReconnectDelayMs) {
+            config.setClientMaxReconnectDelayMs(clientMaxReconnectDelayMs);
+            return this;
+        }
+
+        public Builder clientSocketTimeoutMs(int clientSocketTimeoutMs) {
+            config.setClientSocketTimeoutMs(clientSocketTimeoutMs);
+            return this;
+        }
+
+        public Builder clientProcessingLoopSleepMs(int clientProcessingLoopSleepMs) {
+            config.setClientProcessingLoopSleepMs(clientProcessingLoopSleepMs);
+            return this;
+        }
+
+        public Builder clientDisconnectNoticeDelayMs(int clientDisconnectNoticeDelayMs) {
+            config.setClientDisconnectNoticeDelayMs(clientDisconnectNoticeDelayMs);
+            return this;
+        }
+
+        public Builder reliablePacketTimeoutMs(int reliablePacketTimeoutMs) {
+            config.setReliablePacketTimeoutMs(reliablePacketTimeoutMs);
+            return this;
+        }
+
+        public Builder reliablePacketMaxRetries(int reliablePacketMaxRetries) {
+            config.setReliablePacketMaxRetries(reliablePacketMaxRetries);
+            return this;
+        }
+
+        public Builder maxNameLength(int maxNameLength) {
+            config.setMaxNameLength(maxNameLength);
+            return this;
+        }
+
+        public Builder maxDescriptionLength(int maxDescriptionLength) {
+            config.setMaxDescriptionLength(maxDescriptionLength);
+            return this;
+        }
+
+        public Builder maxPacketCount(int maxPacketCount) {
+            config.setMaxPacketCount(maxPacketCount);
+            return this;
+        }
+
+        public Builder maxPayloadSize(int maxPayloadSize) {
+            config.setMaxPayloadSize(maxPayloadSize);
+            return this;
+        }
+
+        /**
+         * Builds and validates the NeonConfig instance.
+         *
+         * @return the configured NeonConfig instance
+         * @throws IllegalArgumentException if any configuration value is invalid
+         * @since 1.0
+         */
+        public NeonConfig build() {
+            config.validate();
+            return config;
+        }
     }
 }
