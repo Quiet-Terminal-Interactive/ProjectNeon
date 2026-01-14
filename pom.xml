@@ -260,7 +260,6 @@
                 <configuration>
                     <publishingServerId>central</publishingServerId>
                     <deploymentName>Project Neon</deploymentName>
-                    <skipPublishing>true</skipPublishing>
                 </configuration>
             </plugin>
         </plugins>
