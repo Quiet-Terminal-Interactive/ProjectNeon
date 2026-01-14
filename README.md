@@ -6,7 +6,7 @@
 ![License](https://img.shields.io/badge/license-TBD-lightgrey.svg)
 ![Coverage](https://img.shields.io/badge/coverage-80%25-green.svg)
 
-**Version:** 0.2.0 (Beta)
+**Version:** 1.0.0
 **Author:** Kohan Mathers
 **API Documentation:** [JavaDoc](https://quietterminal.github.io/ProjectNeon/)
 
@@ -396,45 +396,45 @@ NeonRelay relay = new NeonRelay("0.0.0.0:7777", config);
 
 **Configuration Categories:**
 
-| Category | Parameters | Default | Description |
-|----------|-----------|---------|-------------|
-| **Socket** | `bufferSize` | 1024 bytes | UDP receive buffer size |
-| **Client** | `clientPingIntervalMs` | 5000 ms | How often to send keep-alive pings |
-| | `clientConnectionTimeoutMs` | 10000 ms | Timeout for connection attempts |
-| | `clientMaxReconnectAttempts` | 5 | Maximum automatic reconnection tries |
-| | `clientInitialReconnectDelayMs` | 1000 ms | Initial reconnection backoff |
-| | `clientMaxReconnectDelayMs` | 30000 ms | Maximum reconnection backoff |
-| | `clientSocketTimeoutMs` | 100 ms | Non-blocking socket timeout |
-| | `clientProcessingLoopSleepMs` | 10 ms | Main loop sleep interval |
-| | `clientDisconnectNoticeDelayMs` | 50 ms | Delay before disconnect notice |
-| **Host** | `hostAckTimeoutMs` | 2000 ms | Timeout before retransmitting |
-| | `hostMaxAckRetries` | 5 | Maximum retransmission attempts |
-| | `hostReliabilityDelayMs` | 50 ms | Delay before sending session config |
-| | `hostGracefulShutdownTimeoutMs` | 2000 ms | Max time to wait for pending ACKs |
-| | `hostSessionTokenTimeoutMs` | 300000 ms | Reconnection window (5 minutes) |
-| | `hostSocketTimeoutMs` | 100 ms | Non-blocking socket timeout |
-| | `hostProcessingLoopSleepMs` | 10 ms | Main loop sleep interval |
-| **Relay** | `relayPort` | 7777 | Default relay server port |
-| | `relayCleanupIntervalMs` | 5000 ms | Session cleanup interval |
-| | `relayClientTimeoutMs` | 15000 ms | Stale client cleanup timeout |
-| | `relaySocketTimeoutMs` | 100 ms | Non-blocking socket timeout |
-| | `relayMainLoopSleepMs` | 1 ms | Main loop sleep interval |
-| | `relayPendingConnectionTimeoutMs` | 30000 ms | Pending connection timeout |
-| **Limits** | `maxPacketsPerSecond` | 100 | Rate limit per client |
-| | `maxClientsPerSession` | 32 | Maximum clients per session |
-| | `maxTotalConnections` | 1000 | Maximum total relay connections |
-| | `maxPendingConnections` | 100 | Maximum pending connections |
-| | `maxRateLimiters` | 2000 | Maximum rate limiter instances |
-| **Rate Limiting** | `floodThreshold` | 3 | Violations before throttling |
-| | `floodWindowMs` | 10000 ms | Flood detection time window |
-| | `throttlePenaltyDivisor` | 2 | Rate reduction factor when throttled |
-| | `tokenRefillIntervalMs` | 1000 ms | Token bucket refill interval |
-| **Reliable Packets** | `reliablePacketTimeoutMs` | 2000 ms | Timeout for reliable packets |
-| | `reliablePacketMaxRetries` | 5 | Max retries for reliable packets |
-| **Protocol Limits** | `maxNameLength` | 64 chars | Maximum name length (protocol) |
-| | `maxDescriptionLength` | 256 chars | Maximum description length |
-| | `maxPacketCount` | 100 | Maximum packet types/ACKs per packet |
-| | `maxPayloadSize` | 65507 bytes | Maximum UDP payload size |
+| Category             | Parameters                        | Default     | Description                          |
+| -------------------- | --------------------------------- | ----------- | ------------------------------------ |
+| **Socket**           | `bufferSize`                      | 1024 bytes  | UDP receive buffer size              |
+| **Client**           | `clientPingIntervalMs`            | 5000 ms     | How often to send keep-alive pings   |
+|                      | `clientConnectionTimeoutMs`       | 10000 ms    | Timeout for connection attempts      |
+|                      | `clientMaxReconnectAttempts`      | 5           | Maximum automatic reconnection tries |
+|                      | `clientInitialReconnectDelayMs`   | 1000 ms     | Initial reconnection backoff         |
+|                      | `clientMaxReconnectDelayMs`       | 30000 ms    | Maximum reconnection backoff         |
+|                      | `clientSocketTimeoutMs`           | 100 ms      | Non-blocking socket timeout          |
+|                      | `clientProcessingLoopSleepMs`     | 10 ms       | Main loop sleep interval             |
+|                      | `clientDisconnectNoticeDelayMs`   | 50 ms       | Delay before disconnect notice       |
+| **Host**             | `hostAckTimeoutMs`                | 2000 ms     | Timeout before retransmitting        |
+|                      | `hostMaxAckRetries`               | 5           | Maximum retransmission attempts      |
+|                      | `hostReliabilityDelayMs`          | 50 ms       | Delay before sending session config  |
+|                      | `hostGracefulShutdownTimeoutMs`   | 2000 ms     | Max time to wait for pending ACKs    |
+|                      | `hostSessionTokenTimeoutMs`       | 300000 ms   | Reconnection window (5 minutes)      |
+|                      | `hostSocketTimeoutMs`             | 100 ms      | Non-blocking socket timeout          |
+|                      | `hostProcessingLoopSleepMs`       | 10 ms       | Main loop sleep interval             |
+| **Relay**            | `relayPort`                       | 7777        | Default relay server port            |
+|                      | `relayCleanupIntervalMs`          | 5000 ms     | Session cleanup interval             |
+|                      | `relayClientTimeoutMs`            | 15000 ms    | Stale client cleanup timeout         |
+|                      | `relaySocketTimeoutMs`            | 100 ms      | Non-blocking socket timeout          |
+|                      | `relayMainLoopSleepMs`            | 1 ms        | Main loop sleep interval             |
+|                      | `relayPendingConnectionTimeoutMs` | 30000 ms    | Pending connection timeout           |
+| **Limits**           | `maxPacketsPerSecond`             | 100         | Rate limit per client                |
+|                      | `maxClientsPerSession`            | 32          | Maximum clients per session          |
+|                      | `maxTotalConnections`             | 1000        | Maximum total relay connections      |
+|                      | `maxPendingConnections`           | 100         | Maximum pending connections          |
+|                      | `maxRateLimiters`                 | 2000        | Maximum rate limiter instances       |
+| **Rate Limiting**    | `floodThreshold`                  | 3           | Violations before throttling         |
+|                      | `floodWindowMs`                   | 10000 ms    | Flood detection time window          |
+|                      | `throttlePenaltyDivisor`          | 2           | Rate reduction factor when throttled |
+|                      | `tokenRefillIntervalMs`           | 1000 ms     | Token bucket refill interval         |
+| **Reliable Packets** | `reliablePacketTimeoutMs`         | 2000 ms     | Timeout for reliable packets         |
+|                      | `reliablePacketMaxRetries`        | 5           | Max retries for reliable packets     |
+| **Protocol Limits**  | `maxNameLength`                   | 64 chars    | Maximum name length (protocol)       |
+|                      | `maxDescriptionLength`            | 256 chars   | Maximum description length           |
+|                      | `maxPacketCount`                  | 100         | Maximum packet types/ACKs per packet |
+|                      | `maxPayloadSize`                  | 65507 bytes | Maximum UDP payload size             |
 
 **Tuning Recommendations:**
 

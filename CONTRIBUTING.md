@@ -839,8 +839,8 @@ Project Neon follows **Semantic Versioning** (semver):
 
 ## Questions?
 
-- **GitHub Issues**: https://github.com/QuietTerminal/ProjectNeon/issues
-- **GitHub Discussions**: https://github.com/QuietTerminal/ProjectNeon/discussions
+- **GitHub Issues**: https://github.com/Quiet-Terminal-Interactive/ProjectNeon/issues
+- **GitHub Discussions**: https://github.com/Quiet-Terminal-Interactive/ProjectNeon/discussions
 - **Email**: kohanmathersmcgonnell@gmail.com
 
 Thank you for contributing to Project Neon!

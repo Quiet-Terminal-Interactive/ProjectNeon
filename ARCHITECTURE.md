@@ -1,6 +1,6 @@
 # Project Neon - Architecture Documentation
 
-**Version:** 0.2.0
+**Version:** 1.0.0
 **Last Updated:** 2026-01-14
 
 ---
@@ -182,13 +182,13 @@ Project Neon is a **minimal, game-agnostic, relay-based UDP multiplayer protocol
 
 ### Component Responsibilities
 
-| Component | Role | Responsibilities |
-|-----------|------|------------------|
-| **NeonRelay** | Packet Router | - Forward packets between clients/host<br>- Manage sessions<br>- Rate limiting and DoS protection<br>- Connection lifecycle tracking |
-| **NeonHost** | Game Server | - Create and own game session<br>- Accept/deny client connections<br>- Implement game logic<br>- Maintain authoritative state<br>- Process game packets |
-| **NeonClient** | Game Client | - Connect to session via relay<br>- Send/receive game packets<br>- Maintain local state<br>- Handle predictions and reconciliation |
-| **NeonSocket** | UDP Abstraction | - Wrap DatagramSocket<br>- Packet serialization/deserialization<br>- Timeout handling |
-| **NeonConfig** | Configuration | - Store all tunable parameters<br>- Validate configuration<br>- Provide defaults |
+| Component      | Role            | Responsibilities                                                                                                                                        |
+| -------------- | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **NeonRelay**  | Packet Router   | - Forward packets between clients/host<br>- Manage sessions<br>- Rate limiting and DoS protection<br>- Connection lifecycle tracking                    |
+| **NeonHost**   | Game Server     | - Create and own game session<br>- Accept/deny client connections<br>- Implement game logic<br>- Maintain authoritative state<br>- Process game packets |
+| **NeonClient** | Game Client     | - Connect to session via relay<br>- Send/receive game packets<br>- Maintain local state<br>- Handle predictions and reconciliation                      |
+| **NeonSocket** | UDP Abstraction | - Wrap DatagramSocket<br>- Packet serialization/deserialization<br>- Timeout handling                                                                   |
+| **NeonConfig** | Configuration   | - Store all tunable parameters<br>- Validate configuration<br>- Provide defaults                                                                        |
 
 ---
 
@@ -239,19 +239,19 @@ Fields:
 
 ### Core Packet Types (0x01-0x0F)
 
-| Type | Value | Purpose | Direction | Reliability |
-|------|-------|---------|-----------|-------------|
-| CONNECT_REQUEST | 0x01 | Client requests to join session | Client → Relay → Host | Best-effort |
-| CONNECT_ACCEPT | 0x02 | Host accepts client connection | Host → Relay → Client | Best-effort |
-| CONNECT_DENY | 0x03 | Host rejects client connection | Host → Relay → Client | Best-effort |
-| SESSION_CONFIG | 0x04 | Host sends session parameters | Host → Relay → Client | **Reliable (ACK)** |
-| PACKET_TYPE_REGISTRY | 0x05 | Host shares packet type definitions | Host → Relay → Client | Best-effort |
-| PING | 0x0B | Client keep-alive / latency check | Client → Relay → Host | Best-effort |
-| PONG | 0x0C | Host responds to ping | Host → Relay → Client | Best-effort |
-| DISCONNECT_NOTICE | 0x0D | Graceful disconnect notification | Any → Relay → Others | Best-effort |
-| ACK | 0x0E | Acknowledgment for reliable packets | Any → Any | Best-effort |
-| RECONNECT_REQUEST | 0x0F | Client attempts reconnection | Client → Relay → Host | Best-effort |
-| GAME_PACKET | 0x10+ | Game-defined packets | Any → Any | Application-defined |
+| Type                 | Value | Purpose                             | Direction             | Reliability         |
+| -------------------- | ----- | ----------------------------------- | --------------------- | ------------------- |
+| CONNECT_REQUEST      | 0x01  | Client requests to join session     | Client → Relay → Host | Best-effort         |
+| CONNECT_ACCEPT       | 0x02  | Host accepts client connection      | Host → Relay → Client | Best-effort         |
+| CONNECT_DENY         | 0x03  | Host rejects client connection      | Host → Relay → Client | Best-effort         |
+| SESSION_CONFIG       | 0x04  | Host sends session parameters       | Host → Relay → Client | **Reliable (ACK)**  |
+| PACKET_TYPE_REGISTRY | 0x05  | Host shares packet type definitions | Host → Relay → Client | Best-effort         |
+| PING                 | 0x0B  | Client keep-alive / latency check   | Client → Relay → Host | Best-effort         |
+| PONG                 | 0x0C  | Host responds to ping               | Host → Relay → Client | Best-effort         |
+| DISCONNECT_NOTICE    | 0x0D  | Graceful disconnect notification    | Any → Relay → Others  | Best-effort         |
+| ACK                  | 0x0E  | Acknowledgment for reliable packets | Any → Any             | Best-effort         |
+| RECONNECT_REQUEST    | 0x0F  | Client attempts reconnection        | Client → Relay → Host | Best-effort         |
+| GAME_PACKET          | 0x10+ | Game-defined packets                | Any → Any             | Application-defined |
 
 **Rationale**:
 - **Minimal set**: Only 10 core types keep protocol simple
