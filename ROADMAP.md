@@ -262,41 +262,41 @@ Project Neon has a solid foundation with excellent architecture, but requires cr
 - [x] Publish JavaDoc to GitHub Pages or docs site
 - [x] Add JavaDoc link to README
 
-#### 8.2 README Improvements
-- [ ] Add "Security Considerations" section
-- [ ] Document UDP unreliability clearly
-- [ ] Add troubleshooting section
-- [ ] Add FAQ section
-- [ ] Update version numbers to 1.0.0
-- [ ] Add badges (build status, version, license)
+#### ~~8.2 README Improvements~~ COMPLETE
+- [x] Add "Security Considerations" section
+- [x] Document UDP unreliability clearly
+- [x] Add troubleshooting section
+- [x] Add FAQ section
+- [x] Update version numbers to 1.0.0
+- [x] Add badges (build status, version, license)
 
-#### 8.3 Developer Guides
-- [ ] Create `CONTRIBUTING.md`:
+#### ~~8.3 Developer Guides~~ COMPLETE
+- [x] Create `CONTRIBUTING.md`:
   - Code style guidelines
   - How to run tests
   - How to submit issues/PRs
-- [ ] Create `ARCHITECTURE.md`:
+- [x] Create `ARCHITECTURE.md`:
   - Design decisions
   - Packet flow diagrams
   - State machine diagrams
-- [ ] Add example projects directory:
+- [x] Add example projects directory:
   - Simple chat application
   - Basic game example
   - Custom packet type example
 
 ---
 
-### 9. Performance Optimization
+### ~~9. Performance Optimization~~ COMPLETE
 
-- [ ] Add buffer pooling for packet processing:
+- [x] Add buffer pooling for packet processing:
   - Reduce garbage collection pressure
   - Reuse byte arrays
-- [ ] Profile relay under high load (1000+ packets/sec)
-- [ ] Optimize hot paths identified by profiling
-- [ ] Consider using virtual threads (Java 21+) for clients
-- [ ] Make receive buffer size configurable
-- [ ] Add batch ACK processing (reduce packet count)
-- [ ] Measure and document performance characteristics:
+- [x] Profile relay under high load (1000+ packets/sec)
+- [x] Optimize hot paths identified by profiling
+- [x] Consider using virtual threads (Java 21+) for clients
+- [x] Make receive buffer size configurable
+- [x] Add batch ACK processing (reduce packet count)
+- [x] Measure and document performance characteristics:
   - Latency (p50, p95, p99)
   - Throughput (packets/second)
   - Memory usage per connection

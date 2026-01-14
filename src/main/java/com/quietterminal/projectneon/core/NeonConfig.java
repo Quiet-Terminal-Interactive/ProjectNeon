@@ -30,6 +30,8 @@ import com.quietterminal.projectneon.PublicAPI;
 public class NeonConfig {
 
     private int bufferSize = 1024;
+    private int bufferPoolInitialSize = 16;
+    private int bufferPoolMaxSize = 64;
 
     private int relayPort = 7777;
     private int relayCleanupIntervalMs = 5000;
@@ -69,6 +71,9 @@ public class NeonConfig {
     private int reliablePacketTimeoutMs = 2000;
     private int reliablePacketMaxRetries = 5;
 
+    private int batchAckMaxSize = 10;
+    private int batchAckMaxDelayMs = 50;
+
     private int maxNameLength = 64;
     private int maxDescriptionLength = 256;
     private int maxPacketCount = 100;
@@ -89,6 +94,12 @@ public class NeonConfig {
     public void validate() {
         if (bufferSize <= 0 || bufferSize > 65535) {
             throw new IllegalArgumentException("bufferSize must be between 1 and 65535, got: " + bufferSize);
+        }
+        if (bufferPoolInitialSize < 0) {
+            throw new IllegalArgumentException("bufferPoolInitialSize must be non-negative, got: " + bufferPoolInitialSize);
+        }
+        if (bufferPoolMaxSize < bufferPoolInitialSize) {
+            throw new IllegalArgumentException("bufferPoolMaxSize must be >= bufferPoolInitialSize, got: " + bufferPoolMaxSize);
         }
 
         if (relayPort < 1 || relayPort > 65535) {
@@ -193,6 +204,13 @@ public class NeonConfig {
             throw new IllegalArgumentException("reliablePacketMaxRetries must be non-negative, got: " + reliablePacketMaxRetries);
         }
 
+        if (batchAckMaxSize <= 0 || batchAckMaxSize > 100) {
+            throw new IllegalArgumentException("batchAckMaxSize must be between 1 and 100, got: " + batchAckMaxSize);
+        }
+        if (batchAckMaxDelayMs <= 0) {
+            throw new IllegalArgumentException("batchAckMaxDelayMs must be positive, got: " + batchAckMaxDelayMs);
+        }
+
         if (maxNameLength <= 0 || maxNameLength > 1024) {
             throw new IllegalArgumentException("maxNameLength must be between 1 and 1024, got: " + maxNameLength);
         }
@@ -213,6 +231,24 @@ public class NeonConfig {
 
     public NeonConfig setBufferSize(int bufferSize) {
         this.bufferSize = bufferSize;
+        return this;
+    }
+
+    public int getBufferPoolInitialSize() {
+        return bufferPoolInitialSize;
+    }
+
+    public NeonConfig setBufferPoolInitialSize(int bufferPoolInitialSize) {
+        this.bufferPoolInitialSize = bufferPoolInitialSize;
+        return this;
+    }
+
+    public int getBufferPoolMaxSize() {
+        return bufferPoolMaxSize;
+    }
+
+    public NeonConfig setBufferPoolMaxSize(int bufferPoolMaxSize) {
+        this.bufferPoolMaxSize = bufferPoolMaxSize;
         return this;
     }
 
@@ -504,6 +540,24 @@ public class NeonConfig {
         return this;
     }
 
+    public int getBatchAckMaxSize() {
+        return batchAckMaxSize;
+    }
+
+    public NeonConfig setBatchAckMaxSize(int batchAckMaxSize) {
+        this.batchAckMaxSize = batchAckMaxSize;
+        return this;
+    }
+
+    public int getBatchAckMaxDelayMs() {
+        return batchAckMaxDelayMs;
+    }
+
+    public NeonConfig setBatchAckMaxDelayMs(int batchAckMaxDelayMs) {
+        this.batchAckMaxDelayMs = batchAckMaxDelayMs;
+        return this;
+    }
+
     public int getMaxNameLength() {
         return maxNameLength;
     }
@@ -564,6 +618,16 @@ public class NeonConfig {
 
         public Builder bufferSize(int bufferSize) {
             config.setBufferSize(bufferSize);
+            return this;
+        }
+
+        public Builder bufferPoolInitialSize(int bufferPoolInitialSize) {
+            config.setBufferPoolInitialSize(bufferPoolInitialSize);
+            return this;
+        }
+
+        public Builder bufferPoolMaxSize(int bufferPoolMaxSize) {
+            config.setBufferPoolMaxSize(bufferPoolMaxSize);
             return this;
         }
 
@@ -724,6 +788,16 @@ public class NeonConfig {
 
         public Builder reliablePacketMaxRetries(int reliablePacketMaxRetries) {
             config.setReliablePacketMaxRetries(reliablePacketMaxRetries);
+            return this;
+        }
+
+        public Builder batchAckMaxSize(int batchAckMaxSize) {
+            config.setBatchAckMaxSize(batchAckMaxSize);
+            return this;
+        }
+
+        public Builder batchAckMaxDelayMs(int batchAckMaxDelayMs) {
+            config.setBatchAckMaxDelayMs(batchAckMaxDelayMs);
             return this;
         }
 

@@ -2,6 +2,7 @@ package com.quietterminal.projectneon.client;
 
 import com.quietterminal.projectneon.core.*;
 import com.quietterminal.projectneon.util.LoggerConfig;
+import com.quietterminal.projectneon.util.VirtualThreads;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -241,6 +242,25 @@ public class NeonClient implements AutoCloseable {
             processPackets();
             Thread.sleep(config.getClientProcessingLoopSleepMs());
         }
+    }
+
+    /**
+     * Starts the client in a background thread using virtual threads if available (Java 21+).
+     * Falls back to platform threads on older JVMs.
+     *
+     * @return the started thread
+     */
+    public Thread runAsync() {
+        return VirtualThreads.startVirtualThread(() -> {
+            try {
+                run();
+            } catch (IOException e) {
+                logger.log(Level.SEVERE, "Client thread IO error", e);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                logger.log(Level.INFO, "Client thread interrupted");
+            }
+        });
     }
 
     public Optional<Byte> getClientId() {

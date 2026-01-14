@@ -2,6 +2,7 @@ package com.quietterminal.projectneon.host;
 
 import com.quietterminal.projectneon.core.*;
 import com.quietterminal.projectneon.util.LoggerConfig;
+import com.quietterminal.projectneon.util.VirtualThreads;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -104,6 +105,25 @@ public class NeonHost implements AutoCloseable {
             checkPendingAcks();
             Thread.sleep(config.getHostProcessingLoopSleepMs());
         }
+    }
+
+    /**
+     * Starts the host in a background thread using virtual threads if available (Java 21+).
+     * Falls back to platform threads on older JVMs.
+     *
+     * @return the started thread
+     */
+    public Thread startAsync() {
+        return VirtualThreads.startVirtualThread(() -> {
+            try {
+                start();
+            } catch (IOException e) {
+                logger.log(Level.SEVERE, "Host thread IO error", e);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                logger.log(Level.INFO, "Host thread interrupted");
+            }
+        });
     }
 
     /**

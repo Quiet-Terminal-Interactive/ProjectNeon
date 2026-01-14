@@ -23,7 +23,7 @@ public class NeonSocket implements AutoCloseable {
 
     private final DatagramChannel channel;
     private final DatagramSocket socket;
-    private final byte[] receiveBuffer;
+    private final ByteBufferPool bufferPool;
 
     @SuppressWarnings("unused")
     private final NeonConfig config;
@@ -60,7 +60,11 @@ public class NeonSocket implements AutoCloseable {
         this.channel = DatagramChannel.open();
         this.socket = channel.socket();
         this.socket.bind(new InetSocketAddress(port));
-        this.receiveBuffer = new byte[config.getBufferSize()];
+        this.bufferPool = new ByteBufferPool(
+            config.getBufferSize(),
+            config.getBufferPoolInitialSize(),
+            config.getBufferPoolMaxSize()
+        );
         setBlocking(false);
     }
 
@@ -107,16 +111,20 @@ public class NeonSocket implements AutoCloseable {
      * Throws SocketTimeoutException in blocking mode with timeout.
      */
     public ReceivedPacket receive() throws IOException {
+        byte[] receiveBuffer = bufferPool.acquire();
         DatagramPacket datagram = new DatagramPacket(receiveBuffer, receiveBuffer.length);
 
         try {
             socket.receive(datagram);
             byte[] data = new byte[datagram.getLength()];
             System.arraycopy(receiveBuffer, 0, data, 0, datagram.getLength());
+            bufferPool.release(receiveBuffer);
             return new ReceivedPacket(data, datagram.getSocketAddress());
         } catch (SocketTimeoutException e) {
+            bufferPool.release(receiveBuffer);
             throw e;
         } catch (IOException e) {
+            bufferPool.release(receiveBuffer);
             if (!channel.isBlocking()) {
                 return null;
             }
