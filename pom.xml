@@ -31,6 +31,27 @@
         </dependency>
     </dependencies>
 
+    <licenses>
+        <license>
+            <name>MIT License</name>
+            <url>https://opensource.org/licenses/MIT</url>
+        </license>
+    </licenses>
+
+    <scm>
+        <connection>scm:git:git://github.com/Quiet-Terminal-Interactive/ProjectNeon.git</connection>
+        <developerConnection>scm:git:ssh://github.com:Quiet-Terminal-Interactive/ProjectNeon.git</developerConnection>
+        <url>https://github.com/Quiet-Terminal-Interactive/ProjectNeon/tree/main</url>
+    </scm>
+
+    <developers>
+        <developer>
+            <name>Kohan Mathers</name>
+            <email>kohanmathersmcgonnell@gmail.com</email>
+            <organization>Quiet Terminal Interactive</organization>
+        </developer>
+    </developers>
+
     <build>
         <plugins>
             <!-- Compiler Plugin -->
@@ -261,6 +282,52 @@
                     <publishingServerId>central</publishingServerId>
                     <deploymentName>Project Neon</deploymentName>
                 </configuration>
+            </plugin>
+
+            <!-- Sources -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-source-plugin</artifactId>
+                <version>3.3.0</version>
+                <executions>
+                    <execution>
+                    <id>attach-sources</id>
+                    <goals>
+                        <goal>jar-no-fork</goal>
+                    </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            
+            <!-- Javadoc -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-javadoc-plugin</artifactId>
+                <version>3.12.0</version>
+                <executions>
+                    <execution>
+                    <id>attach-javadocs</id>
+                    <goals>
+                        <goal>jar</goal>
+                    </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            
+            <!-- GPG Signing -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-gpg-plugin</artifactId>
+                <version>3.1.0</version>
+                <executions>
+                    <execution>
+                    <id>sign-artifacts</id>
+                    <phase>verify</phase>
+                    <goals>
+                        <goal>sign</goal>
+                    </goals>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>
