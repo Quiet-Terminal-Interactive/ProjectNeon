@@ -1,0 +1,8 @@
+com.quietterminal.projectneon
+com.quietterminal.projectneon.client
+com.quietterminal.projectneon.core
+com.quietterminal.projectneon.exceptions
+com.quietterminal.projectneon.host
+com.quietterminal.projectneon.jni
+com.quietterminal.projectneon.relay
+com.quietterminal.projectneon.util
