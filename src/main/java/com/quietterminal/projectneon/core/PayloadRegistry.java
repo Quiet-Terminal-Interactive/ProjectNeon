@@ -44,7 +44,7 @@ public final class PayloadRegistry {
      *
      * @param packetType The packet type byte (should be >= 0x10 for game packets)
      * @param deserializer The deserializer function
-     * @throws IllegalArgumentException if the packet type is a reserved core type (< 0x10)
+     * @throws IllegalArgumentException if the packet type is a reserved core type (under 0x10)
      */
     public static void register(byte packetType, PayloadDeserializer<?> deserializer) {
         if ((packetType & 0xFF) < 0x10) {
