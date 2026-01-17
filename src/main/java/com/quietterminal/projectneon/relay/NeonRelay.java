@@ -8,14 +8,17 @@ import java.net.SocketAddress;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
  * Neon protocol relay server.
  * Routes packets between hosts and clients in a completely payload-agnostic manner.
+ * Implements Lifecycle for clean start/stop semantics.
  */
-public class NeonRelay implements AutoCloseable {
+public class NeonRelay implements AutoCloseable, Lifecycle {
     private static final Logger logger;
 
     static {
@@ -28,7 +31,12 @@ public class NeonRelay implements AutoCloseable {
     private final Map<SocketAddress, PendingConnection> pendingConnections;
     private final Map<SocketAddress, RateLimiter> rateLimiters;
     private final NeonConfig config;
+    private final RelaySemantics relaySemantics;
     private long lastCleanupTime;
+
+    private final AtomicReference<Lifecycle.State> lifecycleState = new AtomicReference<>(Lifecycle.State.CREATED);
+    private final List<Lifecycle.StateChangeListener> stateChangeListeners = new CopyOnWriteArrayList<>();
+    private volatile Thread runningThread;
 
     /**
      * Creates a relay with default configuration.
@@ -57,20 +65,116 @@ public class NeonRelay implements AutoCloseable {
         this.sessionManager = new SessionManager();
         this.pendingConnections = new ConcurrentHashMap<>();
         this.rateLimiters = new ConcurrentHashMap<>();
+        this.relaySemantics = new RelaySemantics();
         this.lastCleanupTime = System.currentTimeMillis();
 
         System.out.println("Relay listening on " + socket.getLocalAddress());
     }
 
-    /**
-     * Starts the relay in a blocking loop.
-     */
-    public void start() throws IOException, InterruptedException {
-        while (true) {
-            processPackets();
-            performCleanup();
-            Thread.sleep(config.getRelayMainLoopSleepMs());
+    @Override
+    public Lifecycle.State getState() {
+        return lifecycleState.get();
+    }
+
+    @Override
+    public void start() {
+        Lifecycle.State current = lifecycleState.get();
+        if (current != Lifecycle.State.CREATED && current != Lifecycle.State.STOPPED) {
+            throw new IllegalStateException("Cannot start from state " + current);
         }
+
+        if (!lifecycleState.compareAndSet(current, Lifecycle.State.STARTING)) {
+            throw new IllegalStateException("State changed during start");
+        }
+        notifyStateChange(current, Lifecycle.State.STARTING, null);
+
+        lifecycleState.set(Lifecycle.State.RUNNING);
+        notifyStateChange(Lifecycle.State.STARTING, Lifecycle.State.RUNNING, null);
+        logger.log(Level.INFO, "Relay started on {0}", socket.getLocalAddress());
+    }
+
+    @Override
+    public void stop() {
+        Lifecycle.State current = lifecycleState.get();
+        if (current != Lifecycle.State.RUNNING && current != Lifecycle.State.STARTING) {
+            return;
+        }
+
+        if (!lifecycleState.compareAndSet(current, Lifecycle.State.STOPPING)) {
+            return;
+        }
+        notifyStateChange(current, Lifecycle.State.STOPPING, null);
+
+        if (runningThread != null) {
+            runningThread.interrupt();
+        }
+
+        try {
+            close();
+            lifecycleState.set(Lifecycle.State.STOPPED);
+            notifyStateChange(Lifecycle.State.STOPPING, Lifecycle.State.STOPPED, null);
+            logger.log(Level.INFO, "Relay stopped");
+        } catch (Exception e) {
+            lifecycleState.set(Lifecycle.State.FAILED);
+            notifyStateChange(Lifecycle.State.STOPPING, Lifecycle.State.FAILED, e);
+        }
+    }
+
+    @Override
+    public void addStateChangeListener(Lifecycle.StateChangeListener listener) {
+        if (listener != null) {
+            stateChangeListeners.add(listener);
+        }
+    }
+
+    @Override
+    public void removeStateChangeListener(Lifecycle.StateChangeListener listener) {
+        stateChangeListeners.remove(listener);
+    }
+
+    private void notifyStateChange(Lifecycle.State oldState, Lifecycle.State newState, Throwable cause) {
+        for (Lifecycle.StateChangeListener listener : stateChangeListeners) {
+            try {
+                listener.onStateChange(oldState, newState, cause);
+            } catch (Exception e) {
+                logger.log(Level.WARNING, "State change listener threw exception", e);
+            }
+        }
+    }
+
+    /**
+     * Runs the relay processing loop.
+     * Call start() first to initialize the relay.
+     *
+     * @throws IOException if a network error occurs
+     * @throws InterruptedException if the thread is interrupted
+     */
+    public void run() throws IOException, InterruptedException {
+        if (lifecycleState.get() != Lifecycle.State.RUNNING) {
+            throw new IllegalStateException("Relay must be started before running");
+        }
+        runningThread = Thread.currentThread();
+        try {
+            while (lifecycleState.get() == Lifecycle.State.RUNNING) {
+                processPackets();
+                performCleanup();
+                Thread.sleep(config.getRelayMainLoopSleepMs());
+            }
+        } finally {
+            runningThread = null;
+        }
+    }
+
+    /**
+     * Starts the relay and runs the processing loop.
+     * Combines start() and run() for convenience.
+     *
+     * @throws IOException if a network error occurs
+     * @throws InterruptedException if the thread is interrupted
+     */
+    public void startAndRun() throws IOException, InterruptedException {
+        start();
+        run();
     }
 
     /**
@@ -265,37 +369,36 @@ public class NeonRelay implements AutoCloseable {
             new Object[]{clientId, session});
     }
 
-    @SuppressWarnings("unused")
     private void routePacket(NeonPacket packet, SocketAddress source) throws IOException {
-        PacketHeader header = packet.header();
-        byte clientId = header.clientId();
-        byte destId = header.destinationId();
-
         sessionManager.updateLastSeen(source);
 
-        Optional<Integer> sessionId = sessionManager.getSessionForPeer(source);
-        if (sessionId.isEmpty()) {
-            logger.log(Level.WARNING, "No session found for peer {0} [PacketType={1}]",
-                new Object[]{source, header.packetType()});
+        Optional<String> validationError = relaySemantics.validateForForwarding(packet);
+        if (validationError.isPresent()) {
+            logger.log(Level.WARNING, "Packet validation failed from {0}: {1}",
+                new Object[]{source, validationError.get()});
             return;
         }
 
-        int session = sessionId.get();
+        RelaySemantics.RoutingDecision decision = relaySemantics.determineRouting(
+            packet, source, sessionManager
+        );
 
-        if (destId == 0) {
-            List<PeerInfo> peers = sessionManager.getPeers(session);
-            for (PeerInfo peer : peers) {
-                if (!peer.addr().equals(source)) {
-                    socket.sendPacket(packet, peer.addr());
+        switch (decision) {
+            case RelaySemantics.RoutingDecision.Unicast unicast -> {
+                socket.sendPacket(unicast.packet(), unicast.destination());
+            }
+            case RelaySemantics.RoutingDecision.Broadcast broadcast -> {
+                for (SocketAddress dest : broadcast.destinations()) {
+                    socket.sendPacket(broadcast.packet(), dest);
                 }
             }
-        } else {
-            Optional<SocketAddress> targetAddr = sessionManager.getPeerAddress(session, destId);
-            if (targetAddr.isPresent()) {
-                socket.sendPacket(packet, targetAddr.get());
-            } else {
-                logger.log(Level.WARNING, "Target client {0} not found in session {1} [ClientID={2}, PacketType={3}]",
-                    new Object[]{destId, session, clientId, header.packetType()});
+            case RelaySemantics.RoutingDecision.Unroutable unroutable -> {
+                logger.log(Level.WARNING, "Unroutable packet from {0}: destination={1}, reason={2}",
+                    new Object[]{source, unroutable.destinationId(), unroutable.reason()});
+            }
+            case RelaySemantics.RoutingDecision.RelayHandled handled -> {
+                logger.log(Level.FINE, "Relay handled packet from {0}: {1}",
+                    new Object[]{source, handled.action()});
             }
         }
     }
@@ -362,7 +465,7 @@ public class NeonRelay implements AutoCloseable {
 /**
  * Manages sessions and peer routing.
  */
-class SessionManager {
+class SessionManager implements RelaySemantics.PeerLookup {
     private final Map<Integer, List<PeerInfo>> sessions = new ConcurrentHashMap<>();
     private final Map<Integer, SocketAddress> hosts = new ConcurrentHashMap<>();
     private final Map<SocketAddress, PeerInfo> peerLookup = new ConcurrentHashMap<>();
@@ -413,6 +516,20 @@ class SessionManager {
 
     public List<PeerInfo> getPeers(int sessionId) {
         return sessions.getOrDefault(sessionId, List.of());
+    }
+
+    @Override
+    public List<SocketAddress> getAllPeersExcept(int sessionId, SocketAddress exclude) {
+        List<PeerInfo> peers = sessions.get(sessionId);
+        if (peers == null) return List.of();
+
+        List<SocketAddress> result = new ArrayList<>();
+        for (PeerInfo peer : peers) {
+            if (!peer.addr().equals(exclude)) {
+                result.add(peer.addr());
+            }
+        }
+        return result;
     }
 
     public int getClientCount(int sessionId) {

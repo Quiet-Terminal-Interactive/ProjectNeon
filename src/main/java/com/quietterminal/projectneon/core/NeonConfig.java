@@ -29,9 +29,11 @@ import com.quietterminal.projectneon.PublicAPI;
 @PublicAPI
 public class NeonConfig {
 
-    private int bufferSize = 1024;
+    private int bufferSize = 65535;
     private int bufferPoolInitialSize = 16;
     private int bufferPoolMaxSize = 64;
+    private int minBufferSize = 1024;
+    private boolean enforceBufferSize = true;
 
     private int relayPort = 7777;
     private int relayCleanupIntervalMs = 5000;
@@ -79,6 +81,9 @@ public class NeonConfig {
     private int maxPacketCount = 100;
     private int maxPayloadSize = 65507;
 
+    private boolean useEventDrivenReceiver = false;
+    private int eventLoopSelectTimeoutMs = 100;
+
     /**
      * Creates a NeonConfig with default values suitable for typical game networking.
      */
@@ -94,6 +99,9 @@ public class NeonConfig {
     public void validate() {
         if (bufferSize <= 0 || bufferSize > 65535) {
             throw new IllegalArgumentException("bufferSize must be between 1 and 65535, got: " + bufferSize);
+        }
+        if (minBufferSize <= 0 || minBufferSize > bufferSize) {
+            throw new IllegalArgumentException("minBufferSize must be between 1 and bufferSize, got: " + minBufferSize);
         }
         if (bufferPoolInitialSize < 0) {
             throw new IllegalArgumentException("bufferPoolInitialSize must be non-negative, got: " + bufferPoolInitialSize);
@@ -223,6 +231,10 @@ public class NeonConfig {
         if (maxPayloadSize <= 0 || maxPayloadSize > 65507) {
             throw new IllegalArgumentException("maxPayloadSize must be between 1 and 65507 (UDP limit), got: " + maxPayloadSize);
         }
+
+        if (eventLoopSelectTimeoutMs < 0) {
+            throw new IllegalArgumentException("eventLoopSelectTimeoutMs must be non-negative, got: " + eventLoopSelectTimeoutMs);
+        }
     }
 
     public int getBufferSize() {
@@ -249,6 +261,24 @@ public class NeonConfig {
 
     public NeonConfig setBufferPoolMaxSize(int bufferPoolMaxSize) {
         this.bufferPoolMaxSize = bufferPoolMaxSize;
+        return this;
+    }
+
+    public int getMinBufferSize() {
+        return minBufferSize;
+    }
+
+    public NeonConfig setMinBufferSize(int minBufferSize) {
+        this.minBufferSize = minBufferSize;
+        return this;
+    }
+
+    public boolean isEnforceBufferSize() {
+        return enforceBufferSize;
+    }
+
+    public NeonConfig setEnforceBufferSize(boolean enforceBufferSize) {
+        this.enforceBufferSize = enforceBufferSize;
         return this;
     }
 
@@ -594,6 +624,24 @@ public class NeonConfig {
         return this;
     }
 
+    public boolean isUseEventDrivenReceiver() {
+        return useEventDrivenReceiver;
+    }
+
+    public NeonConfig setUseEventDrivenReceiver(boolean useEventDrivenReceiver) {
+        this.useEventDrivenReceiver = useEventDrivenReceiver;
+        return this;
+    }
+
+    public int getEventLoopSelectTimeoutMs() {
+        return eventLoopSelectTimeoutMs;
+    }
+
+    public NeonConfig setEventLoopSelectTimeoutMs(int eventLoopSelectTimeoutMs) {
+        this.eventLoopSelectTimeoutMs = eventLoopSelectTimeoutMs;
+        return this;
+    }
+
     /**
      * Creates a new builder for constructing NeonConfig instances.
      *
@@ -628,6 +676,16 @@ public class NeonConfig {
 
         public Builder bufferPoolMaxSize(int bufferPoolMaxSize) {
             config.setBufferPoolMaxSize(bufferPoolMaxSize);
+            return this;
+        }
+
+        public Builder minBufferSize(int minBufferSize) {
+            config.setMinBufferSize(minBufferSize);
+            return this;
+        }
+
+        public Builder enforceBufferSize(boolean enforceBufferSize) {
+            config.setEnforceBufferSize(enforceBufferSize);
             return this;
         }
 
@@ -818,6 +876,16 @@ public class NeonConfig {
 
         public Builder maxPayloadSize(int maxPayloadSize) {
             config.setMaxPayloadSize(maxPayloadSize);
+            return this;
+        }
+
+        public Builder useEventDrivenReceiver(boolean useEventDrivenReceiver) {
+            config.setUseEventDrivenReceiver(useEventDrivenReceiver);
+            return this;
+        }
+
+        public Builder eventLoopSelectTimeoutMs(int eventLoopSelectTimeoutMs) {
+            config.setEventLoopSelectTimeoutMs(eventLoopSelectTimeoutMs);
             return this;
         }
 

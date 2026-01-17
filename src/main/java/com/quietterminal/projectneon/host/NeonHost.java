@@ -9,6 +9,7 @@ import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.logging.Level;
@@ -17,8 +18,9 @@ import java.util.logging.Logger;
 /**
  * Neon protocol host implementation.
  * The host manages game sessions and coordinates clients through a relay.
+ * Implements Lifecycle for clean start/stop semantics.
  */
-public class NeonHost implements AutoCloseable {
+public class NeonHost implements AutoCloseable, Lifecycle {
     private static final Logger logger;
 
     static {
@@ -37,7 +39,8 @@ public class NeonHost implements AutoCloseable {
     private short nextSequence = 0;
 
     private final Map<Byte, String> connectedClients = new ConcurrentHashMap<>();
-    private final Map<Byte, PendingAck> pendingAcks = new ConcurrentHashMap<>();
+    private final AckStateMachine ackStateMachine;
+    private final Map<Short, Byte> sequenceToClient = new ConcurrentHashMap<>();
     private final Map<Byte, Long> clientTokens = new ConcurrentHashMap<>();
     private final Map<Byte, DisconnectedClient> disconnectedClients = new ConcurrentHashMap<>();
     private final java.security.SecureRandom secureRandom = new java.security.SecureRandom();
@@ -47,6 +50,10 @@ public class NeonHost implements AutoCloseable {
     private Consumer<Byte> pingReceivedCallback;
     private BiConsumer<Byte, Byte> unhandledPacketCallback;
     private Consumer<Byte> clientDisconnectCallback;
+
+    private final AtomicReference<Lifecycle.State> lifecycleState = new AtomicReference<>(Lifecycle.State.CREATED);
+    private final List<Lifecycle.StateChangeListener> stateChangeListeners = new java.util.concurrent.CopyOnWriteArrayList<>();
+    private volatile Thread runningThread;
 
     /**
      * Creates a host with default configuration.
@@ -72,6 +79,7 @@ public class NeonHost implements AutoCloseable {
         this.socket = new NeonSocket(config);
         this.socket.setBlocking(true);
         this.socket.setSoTimeout(config.getHostSocketTimeoutMs());
+        this.ackStateMachine = AckStateMachine.fromConfig(config, true);
 
         String[] parts = relayAddress.split(":");
         if (parts.length != 2) {
@@ -82,11 +90,85 @@ public class NeonHost implements AutoCloseable {
         this.relayAddr = new InetSocketAddress(host, port);
     }
 
-    /**
-     * Starts the host and registers with the relay.
-     * This is a blocking call that runs the host processing loop.
-     */
-    public void start() throws IOException, InterruptedException {
+    @Override
+    public Lifecycle.State getState() {
+        return lifecycleState.get();
+    }
+
+    @Override
+    public void start() {
+        Lifecycle.State current = lifecycleState.get();
+        if (current != Lifecycle.State.CREATED && current != Lifecycle.State.STOPPED) {
+            throw new IllegalStateException("Cannot start from state " + current);
+        }
+
+        if (!lifecycleState.compareAndSet(current, Lifecycle.State.STARTING)) {
+            throw new IllegalStateException("State changed during start");
+        }
+        notifyStateChange(current, Lifecycle.State.STARTING, null);
+
+        try {
+            doStart();
+            lifecycleState.set(Lifecycle.State.RUNNING);
+            notifyStateChange(Lifecycle.State.STARTING, Lifecycle.State.RUNNING, null);
+            logger.log(Level.INFO, "Host started [SessionID={0}]", sessionId);
+        } catch (Exception e) {
+            lifecycleState.set(Lifecycle.State.FAILED);
+            notifyStateChange(Lifecycle.State.STARTING, Lifecycle.State.FAILED, e);
+            throw new RuntimeException("Host failed to start", e);
+        }
+    }
+
+    @Override
+    public void stop() {
+        Lifecycle.State current = lifecycleState.get();
+        if (current != Lifecycle.State.RUNNING && current != Lifecycle.State.STARTING) {
+            return;
+        }
+
+        if (!lifecycleState.compareAndSet(current, Lifecycle.State.STOPPING)) {
+            return;
+        }
+        notifyStateChange(current, Lifecycle.State.STOPPING, null);
+
+        if (runningThread != null) {
+            runningThread.interrupt();
+        }
+
+        try {
+            close();
+            lifecycleState.set(Lifecycle.State.STOPPED);
+            notifyStateChange(Lifecycle.State.STOPPING, Lifecycle.State.STOPPED, null);
+            logger.log(Level.INFO, "Host stopped [SessionID={0}]", sessionId);
+        } catch (Exception e) {
+            lifecycleState.set(Lifecycle.State.FAILED);
+            notifyStateChange(Lifecycle.State.STOPPING, Lifecycle.State.FAILED, e);
+        }
+    }
+
+    @Override
+    public void addStateChangeListener(Lifecycle.StateChangeListener listener) {
+        if (listener != null) {
+            stateChangeListeners.add(listener);
+        }
+    }
+
+    @Override
+    public void removeStateChangeListener(Lifecycle.StateChangeListener listener) {
+        stateChangeListeners.remove(listener);
+    }
+
+    private void notifyStateChange(Lifecycle.State oldState, Lifecycle.State newState, Throwable cause) {
+        for (Lifecycle.StateChangeListener listener : stateChangeListeners) {
+            try {
+                listener.onStateChange(oldState, newState, cause);
+            } catch (Exception e) {
+                logger.log(Level.WARNING, "State change listener threw exception", e);
+            }
+        }
+    }
+
+    private void doStart() throws IOException {
         long hostToken = secureRandom.nextLong();
         clientTokens.put(HOST_CLIENT_ID, hostToken);
 
@@ -99,12 +181,41 @@ public class NeonHost implements AutoCloseable {
         socket.sendPacket(packet, relayAddr);
 
         System.out.println("Host registered with session ID: " + sessionId);
+    }
 
-        while (true) {
-            processPackets();
-            checkPendingAcks();
-            Thread.sleep(config.getHostProcessingLoopSleepMs());
+    /**
+     * Runs the host processing loop.
+     * Call start() first to register with the relay.
+     *
+     * @throws IOException if a network error occurs
+     * @throws InterruptedException if the thread is interrupted
+     */
+    public void run() throws IOException, InterruptedException {
+        if (lifecycleState.get() != Lifecycle.State.RUNNING) {
+            throw new IllegalStateException("Host must be started before running");
         }
+        runningThread = Thread.currentThread();
+        try {
+            while (lifecycleState.get() == Lifecycle.State.RUNNING) {
+                processPackets();
+                checkPendingAcks();
+                Thread.sleep(config.getHostProcessingLoopSleepMs());
+            }
+        } finally {
+            runningThread = null;
+        }
+    }
+
+    /**
+     * Starts the host, registers with relay, and runs the processing loop.
+     * Combines start() and run() for convenience.
+     *
+     * @throws IOException if a network error occurs
+     * @throws InterruptedException if the thread is interrupted
+     */
+    public void startAndRun() throws IOException, InterruptedException {
+        start();
+        run();
     }
 
     /**
@@ -116,7 +227,7 @@ public class NeonHost implements AutoCloseable {
     public Thread startAsync() {
         return VirtualThreads.startVirtualThread(() -> {
             try {
-                start();
+                startAndRun();
             } catch (IOException e) {
                 logger.log(Level.SEVERE, "Host thread IO error", e);
             } catch (InterruptedException e) {
@@ -159,7 +270,9 @@ public class NeonHost implements AutoCloseable {
             }
             case PacketPayload.Ack ack -> {
                 for (Short seq : ack.acknowledgedSequences()) {
-                    pendingAcks.values().removeIf(pending -> pending.sequence() == seq);
+                    if (ackStateMachine.acknowledge(seq)) {
+                        sequenceToClient.remove(seq);
+                    }
                 }
             }
             case PacketPayload.DisconnectNotice ignored -> {
@@ -177,7 +290,7 @@ public class NeonHost implements AutoCloseable {
                         new Object[]{disconnectedClientId, sessionId});
                 }
 
-                pendingAcks.remove(disconnectedClientId);
+                sequenceToClient.entrySet().removeIf(e -> e.getValue() == disconnectedClientId);
                 if (clientDisconnectCallback != null) {
                     clientDisconnectCallback.accept(disconnectedClientId);
                 }
@@ -226,17 +339,16 @@ public class NeonHost implements AutoCloseable {
         }
 
         short seq = nextSequence++;
-        PacketPayload.SessionConfig config = new PacketPayload.SessionConfig(
+        PacketPayload.SessionConfig sessionConfig = new PacketPayload.SessionConfig(
             PacketHeader.VERSION, (short) 60, (short) 1024
         );
         NeonPacket configPacket = NeonPacket.create(
-            PacketType.SESSION_CONFIG, seq, HOST_CLIENT_ID, assignedId, config
+            PacketType.SESSION_CONFIG, seq, HOST_CLIENT_ID, assignedId, sessionConfig
         );
         socket.sendPacket(configPacket, relayAddr);
 
-        pendingAcks.put(assignedId, new PendingAck(
-            seq, assignedId, configPacket, System.currentTimeMillis(), 0
-        ));
+        ackStateMachine.track(seq, configPacket);
+        sequenceToClient.put(seq, assignedId);
 
         PacketPayload.PacketTypeRegistry registry = new PacketPayload.PacketTypeRegistry(List.of());
         NeonPacket registryPacket = NeonPacket.create(
@@ -311,28 +423,20 @@ public class NeonHost implements AutoCloseable {
     }
 
     private void checkPendingAcks() throws IOException {
-        long now = System.currentTimeMillis();
-        List<Byte> toRemove = new ArrayList<>();
+        AckStateMachine.ProcessResult result = ackStateMachine.process();
 
-        for (Map.Entry<Byte, PendingAck> entry : pendingAcks.entrySet()) {
-            PendingAck pending = entry.getValue();
-
-            if (now - pending.lastSentTime() >= config.getHostAckTimeoutMs()) {
-                if (pending.retryCount() >= config.getHostMaxAckRetries()) {
-                    logger.log(Level.WARNING, "Client {0} failed to ACK after {1} retries [SessionID={2}, Sequence={3}]",
-                        new Object[]{pending.clientId(), config.getHostMaxAckRetries(), sessionId, pending.sequence()});
-                    toRemove.add(entry.getKey());
-                } else {
-                    socket.sendPacket(pending.packet(), relayAddr);
-                    pendingAcks.put(entry.getKey(), new PendingAck(
-                        pending.sequence(), pending.clientId(), pending.packet(),
-                        now, pending.retryCount() + 1
-                    ));
-                }
-            }
+        for (AckStateMachine.PendingPacket pending : result.needsRetry()) {
+            socket.sendPacket(pending.packet(), relayAddr);
+            ackStateMachine.markResent(pending.sequence());
         }
 
-        toRemove.forEach(pendingAcks::remove);
+        for (AckStateMachine.PendingPacket failed : result.failed()) {
+            Byte clientId = sequenceToClient.remove(failed.sequence());
+            if (clientId != null) {
+                logger.log(Level.WARNING, "Client {0} failed to ACK after {1} retries [SessionID={2}, Sequence={3}]",
+                    new Object[]{clientId, config.getHostMaxAckRetries(), sessionId, failed.sequence()});
+            }
+        }
     }
 
     public int getSessionId() {
@@ -383,7 +487,7 @@ public class NeonHost implements AutoCloseable {
                     new Object[]{sessionId});
             }
 
-            while (!pendingAcks.isEmpty() &&
+            while (ackStateMachine.hasPending() &&
                    System.currentTimeMillis() - shutdownStart < config.getHostGracefulShutdownTimeoutMs()) {
                 try {
                     processPackets();
@@ -397,24 +501,13 @@ public class NeonHost implements AutoCloseable {
                 }
             }
 
-            if (!pendingAcks.isEmpty()) {
+            if (ackStateMachine.hasPending()) {
                 logger.log(Level.WARNING, "Graceful shutdown timeout: {0} pending ACKs remaining [SessionID={1}]",
-                    new Object[]{pendingAcks.size(), sessionId});
+                    new Object[]{ackStateMachine.pendingCount(), sessionId});
             }
         }
         socket.close();
     }
-
-    /**
-     * Tracks packets awaiting acknowledgment.
-     */
-    private record PendingAck(
-        short sequence,
-        byte clientId,
-        NeonPacket packet,
-        long lastSentTime,
-        int retryCount
-    ) {}
 
     /**
      * Tracks disconnected clients for reconnection support.

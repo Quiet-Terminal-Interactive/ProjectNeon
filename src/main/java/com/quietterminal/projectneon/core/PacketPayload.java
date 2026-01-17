@@ -8,19 +8,21 @@ import java.util.List;
 
 /**
  * Base interface for all packet payloads.
+ *
+ * <p>This interface is intentionally non-sealed to allow custom payload implementations.
+ * Third-party code can implement this interface to define custom packet types for
+ * game-specific data.
+ *
+ * <p>To register a custom payload type:
+ * <ol>
+ *   <li>Implement this interface with a {@code toBytes()} method</li>
+ *   <li>Provide a static {@code fromBytes(byte[])} factory method</li>
+ *   <li>Register the type using {@link PayloadRegistry#register(byte, PayloadDeserializer)}</li>
+ * </ol>
+ *
+ * @see PayloadRegistry
  */
-public sealed interface PacketPayload permits
-    PacketPayload.ConnectRequest,
-    PacketPayload.ConnectAccept,
-    PacketPayload.ConnectDeny,
-    PacketPayload.SessionConfig,
-    PacketPayload.PacketTypeRegistry,
-    PacketPayload.Ping,
-    PacketPayload.Pong,
-    PacketPayload.DisconnectNotice,
-    PacketPayload.Ack,
-    PacketPayload.ReconnectRequest,
-    PacketPayload.GamePacket {
+public interface PacketPayload {
 
     int MAX_NAME_LENGTH = 64;
     int MAX_DESCRIPTION_LENGTH = 256;

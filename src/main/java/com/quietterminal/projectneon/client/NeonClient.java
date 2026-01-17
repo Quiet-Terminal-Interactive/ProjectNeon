@@ -8,7 +8,10 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.time.Duration;
+import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.logging.Level;
@@ -16,8 +19,9 @@ import java.util.logging.Logger;
 
 /**
  * Neon protocol client implementation.
+ * Implements Lifecycle for clean start/stop semantics.
  */
-public class NeonClient implements AutoCloseable {
+public class NeonClient implements AutoCloseable, Lifecycle {
     private static final Logger logger;
 
     static {
@@ -44,6 +48,12 @@ public class NeonClient implements AutoCloseable {
     private BiConsumer<Byte, Byte> unhandledPacketCallback;
     private BiConsumer<Byte, Byte> wrongDestinationCallback;
     private Consumer<Byte> disconnectCallback;
+
+    private final AtomicReference<Lifecycle.State> lifecycleState = new AtomicReference<>(Lifecycle.State.CREATED);
+    private final List<Lifecycle.StateChangeListener> stateChangeListeners = new CopyOnWriteArrayList<>();
+    private volatile Thread runningThread;
+    private volatile int pendingSessionId;
+    private volatile String pendingRelayAddress;
 
     /**
      * Creates a client with default configuration.
@@ -234,31 +244,188 @@ public class NeonClient implements AutoCloseable {
         socket.sendPacket(packet, relayAddr);
     }
 
+    @Override
+    public Lifecycle.State getState() {
+        return lifecycleState.get();
+    }
+
+    @Override
+    public void start() {
+        Lifecycle.State current = lifecycleState.get();
+        if (current != Lifecycle.State.CREATED && current != Lifecycle.State.STOPPED) {
+            throw new IllegalStateException("Cannot start from state " + current);
+        }
+
+        if (pendingSessionId <= 0 || pendingRelayAddress == null) {
+            throw new IllegalStateException("Must call setTarget() before start()");
+        }
+
+        if (!lifecycleState.compareAndSet(current, Lifecycle.State.STARTING)) {
+            throw new IllegalStateException("State changed during start");
+        }
+        notifyStateChange(current, Lifecycle.State.STARTING, null);
+
+        try {
+            boolean connected = connect(pendingSessionId, pendingRelayAddress);
+            if (connected) {
+                lifecycleState.set(Lifecycle.State.RUNNING);
+                notifyStateChange(Lifecycle.State.STARTING, Lifecycle.State.RUNNING, null);
+                logger.log(Level.INFO, "Client started [SessionID={0}, ClientID={1}]",
+                    new Object[]{sessionId, clientId});
+            } else {
+                lifecycleState.set(Lifecycle.State.FAILED);
+                notifyStateChange(Lifecycle.State.STARTING, Lifecycle.State.FAILED, null);
+            }
+        } catch (Exception e) {
+            lifecycleState.set(Lifecycle.State.FAILED);
+            notifyStateChange(Lifecycle.State.STARTING, Lifecycle.State.FAILED, e);
+            throw new RuntimeException("Client failed to start", e);
+        }
+    }
+
+    @Override
+    public void stop() {
+        Lifecycle.State current = lifecycleState.get();
+        if (current != Lifecycle.State.RUNNING && current != Lifecycle.State.STARTING) {
+            return;
+        }
+
+        if (!lifecycleState.compareAndSet(current, Lifecycle.State.STOPPING)) {
+            return;
+        }
+        notifyStateChange(current, Lifecycle.State.STOPPING, null);
+
+        if (runningThread != null) {
+            runningThread.interrupt();
+        }
+
+        try {
+            close();
+            lifecycleState.set(Lifecycle.State.STOPPED);
+            notifyStateChange(Lifecycle.State.STOPPING, Lifecycle.State.STOPPED, null);
+            logger.log(Level.INFO, "Client stopped [SessionID={0}, ClientID={1}]",
+                new Object[]{sessionId, clientId});
+        } catch (Exception e) {
+            lifecycleState.set(Lifecycle.State.FAILED);
+            notifyStateChange(Lifecycle.State.STOPPING, Lifecycle.State.FAILED, e);
+        }
+    }
+
+    @Override
+    public void addStateChangeListener(Lifecycle.StateChangeListener listener) {
+        if (listener != null) {
+            stateChangeListeners.add(listener);
+        }
+    }
+
+    @Override
+    public void removeStateChangeListener(Lifecycle.StateChangeListener listener) {
+        stateChangeListeners.remove(listener);
+    }
+
+    private void notifyStateChange(Lifecycle.State oldState, Lifecycle.State newState, Throwable cause) {
+        for (Lifecycle.StateChangeListener listener : stateChangeListeners) {
+            try {
+                listener.onStateChange(oldState, newState, cause);
+            } catch (Exception e) {
+                logger.log(Level.WARNING, "State change listener threw exception", e);
+            }
+        }
+    }
+
     /**
-     * Runs the client in a blocking loop, processing packets every 10ms.
+     * Sets the target session and relay for connection.
+     * Must be called before start() when using the Lifecycle interface.
+     *
+     * @param sessionId the session ID to connect to
+     * @param relayAddress the relay address (host:port)
+     * @return this client for chaining
+     */
+    public NeonClient setTarget(int sessionId, String relayAddress) {
+        this.pendingSessionId = sessionId;
+        this.pendingRelayAddress = relayAddress;
+        return this;
+    }
+
+    /**
+     * Runs the client in a blocking loop, processing packets.
+     *
+     * @throws IOException if a network error occurs
+     * @throws InterruptedException if the thread is interrupted
      */
     public void run() throws IOException, InterruptedException {
-        while (true) {
-            processPackets();
-            Thread.sleep(config.getClientProcessingLoopSleepMs());
+        if (lifecycleState.get() != Lifecycle.State.RUNNING) {
+            throw new IllegalStateException("Client must be started before running");
         }
+        runningThread = Thread.currentThread();
+        try {
+            while (lifecycleState.get() == Lifecycle.State.RUNNING) {
+                processPackets();
+                Thread.sleep(config.getClientProcessingLoopSleepMs());
+            }
+        } finally {
+            runningThread = null;
+        }
+    }
+
+    /**
+     * Starts the client, connects to relay, and runs the processing loop.
+     * Combines start() and run() for convenience.
+     *
+     * @throws IOException if a network error occurs
+     * @throws InterruptedException if the thread is interrupted
+     */
+    public void startAndRun() throws IOException, InterruptedException {
+        start();
+        run();
     }
 
     /**
      * Starts the client in a background thread using virtual threads if available (Java 21+).
      * Falls back to platform threads on older JVMs.
+     * Requires setTarget() to be called first.
      *
      * @return the started thread
      */
-    public Thread runAsync() {
+    public Thread startAsync() {
         return VirtualThreads.startVirtualThread(() -> {
             try {
-                run();
+                startAndRun();
             } catch (IOException e) {
                 logger.log(Level.SEVERE, "Client thread IO error", e);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 logger.log(Level.INFO, "Client thread interrupted");
+            }
+        });
+    }
+
+    /**
+     * Runs the client processing loop in a background thread.
+     * Call connect() first to establish the connection.
+     *
+     * @return the started thread
+     * @deprecated Use startAsync() instead
+     */
+    @Deprecated
+    public Thread runAsync() {
+        return VirtualThreads.startVirtualThread(() -> {
+            try {
+                if (lifecycleState.get() == Lifecycle.State.CREATED && clientId != null) {
+                    lifecycleState.set(Lifecycle.State.RUNNING);
+                }
+                runningThread = Thread.currentThread();
+                while (lifecycleState.get() == Lifecycle.State.RUNNING) {
+                    processPackets();
+                    Thread.sleep(config.getClientProcessingLoopSleepMs());
+                }
+            } catch (IOException e) {
+                logger.log(Level.SEVERE, "Client thread IO error", e);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                logger.log(Level.INFO, "Client thread interrupted");
+            } finally {
+                runningThread = null;
             }
         });
     }

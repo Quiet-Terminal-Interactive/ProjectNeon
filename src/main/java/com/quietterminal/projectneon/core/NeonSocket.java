@@ -25,7 +25,6 @@ public class NeonSocket implements AutoCloseable {
     private final DatagramSocket socket;
     private final ByteBufferPool bufferPool;
 
-    @SuppressWarnings("unused")
     private final NeonConfig config;
 
     /**
@@ -109,6 +108,9 @@ public class NeonSocket implements AutoCloseable {
      * Receives a packet from the socket.
      * Returns null if no packet is available (non-blocking mode).
      * Throws SocketTimeoutException in blocking mode with timeout.
+     *
+     * When buffer enforcement is enabled, packets that fill the entire buffer
+     * are logged as potential truncation and rejected if enforcement is strict.
      */
     public ReceivedPacket receive() throws IOException {
         byte[] receiveBuffer = bufferPool.acquire();
@@ -116,8 +118,26 @@ public class NeonSocket implements AutoCloseable {
 
         try {
             socket.receive(datagram);
-            byte[] data = new byte[datagram.getLength()];
-            System.arraycopy(receiveBuffer, 0, data, 0, datagram.getLength());
+            int receivedLength = datagram.getLength();
+
+            if (config.isEnforceBufferSize() && receivedLength == receiveBuffer.length) {
+                logger.log(Level.WARNING,
+                    "Packet from {0} filled entire buffer ({1} bytes) - possible truncation, dropping packet",
+                    new Object[]{datagram.getSocketAddress(), receivedLength});
+                bufferPool.release(receiveBuffer);
+                return null;
+            }
+
+            if (receivedLength < config.getMinBufferSize() && receivedLength < PacketHeader.HEADER_SIZE) {
+                logger.log(Level.WARNING,
+                    "Packet from {0} too small ({1} bytes, minimum header is {2} bytes)",
+                    new Object[]{datagram.getSocketAddress(), receivedLength, PacketHeader.HEADER_SIZE});
+                bufferPool.release(receiveBuffer);
+                return null;
+            }
+
+            byte[] data = new byte[receivedLength];
+            System.arraycopy(receiveBuffer, 0, data, 0, receivedLength);
             bufferPool.release(receiveBuffer);
             return new ReceivedPacket(data, datagram.getSocketAddress());
         } catch (SocketTimeoutException e) {

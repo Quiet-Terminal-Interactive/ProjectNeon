@@ -1,7 +1,7 @@
 # Project Neon - Architecture Documentation
 
-**Version:** 1.0.0
-**Last Updated:** 2026-01-14
+**Version:** 1.1.0
+**Last Updated:** 2026-01-17
 
 ---
 
@@ -1243,41 +1243,86 @@ switch (payload) {
 
 ## Future Architecture
 
-### Planned Improvements
+### Recently Implemented (v1.1)
 
-**From ROADMAP.md section 9.5**:
+1. **Full-size receive buffers + enforcement**: Default buffer size increased to 65535 bytes with
+   truncation detection and enforcement options via `NeonConfig.setEnforceBufferSize()`.
 
-1. **Full-size receive buffers + enforcement**: Currently 1024 bytes (configurable), may truncate large packets
-2. **Event-driven receive loop**: Replace polling with NIO selectors for efficiency
-3. **Structured logging**: JSON-formatted logs for easy parsing and monitoring
-4. **Runtime configuration**: Hot-reload config without restart
-5. **Core metrics**: Prometheus endpoint for monitoring (packet rate, latency, errors)
-6. **Clean start/stop lifecycle**: Graceful shutdown for all components
-7. **Transport interface**: Abstract transport (UDP, TCP, QUIC) behind interface
+2. **Honest relay semantics**: `RelaySemantics` class provides deterministic, transparent packet
+   routing with explicit routing decisions (Unicast, Broadcast, Unroutable, RelayHandled).
+
+3. **Unsealed payload architecture**: `PacketPayload` is now a non-sealed interface allowing custom
+   payload types. Use `PayloadRegistry.register()` to add custom deserializers for game packets.
+
+4. **Centralized ACK state machine**: `AckStateMachine` provides unified acknowledgment tracking
+   with timeout detection, retry signaling, and failure callbacks for both host and client.
+
+5. **Event-driven receive loop**: `EventDrivenReceiver` uses NIO Selector for non-blocking I/O,
+   eliminating sleep-based polling. Enable via `NeonConfig.setUseEventDrivenReceiver(true)`.
+
+6. **Game packet registry with subtype/version/validation**: `GamePacketRegistry` and
+   `GamePacketDescriptor` provide rich metadata, subtype ranges, versioning support, and
+   custom validators for game packet types. Extends `PayloadRegistry` with schema evolution.
+
+7. **Core metrics**: `NeonMetrics` provides thread-safe, lock-free metrics collection including
+   packet counts, byte counts, latency tracking (min/max/avg), error counts by type, and
+   connection statistics. Supports snapshots for monitoring and Prometheus integration.
+
+8. **Runtime configuration**: `RuntimeConfig` enables hot-reload configuration with change
+   listeners, file-based persistence, and bidirectional conversion to/from `NeonConfig`.
+   Supports reactive updates without restart.
+
+9. **Payload size enforcement**: `PayloadSizeEnforcer` validates payload sizes with configurable
+   limits, strict mode for exceptions, integration with `GamePacketRegistry` per-type limits,
+   and optional automatic truncation with warnings.
+
+10. **Explicit version mismatch handling**: `VersionMismatchHandler` provides configurable
+    version compatibility checking with strict/lenient modes, version range support, suggested
+    upgrade/downgrade actions, and mismatch event listeners.
+
+11. **Clean start/stop lifecycle**: `Lifecycle` interface provides consistent state machine
+    (CREATED → STARTING → RUNNING → STOPPING → STOPPED) for all components with state change
+    listeners. `NeonHost`, `NeonClient`, and `NeonRelay` all implement `Lifecycle`.
+
+12. **Transport interface**: `Transport` interface abstracts the transport layer, with `UdpTransport`
+    as the default implementation. Enables future TCP/QUIC support without changing component code.
+
+13. **Structured logging**: `StructuredLogger` provides JSON-formatted logs with key-value context,
+    log entry builders, and JUL handler integration. Enable JSON mode via `setJsonEnabled(true)`.
+
+14. **Better backpressure signals**: `Backpressure` provides flow control with high/low water marks,
+    signal states (NORMAL, WARNING, CRITICAL, RECOVERED), rate tracking, and listener notifications.
+
+15. **Session state serialization**: `SessionState` defines a binary format for persisting session
+    data including clients, tokens, and custom application data. Foundation for session recovery.
 
 ### Post-1.0 Features
 
-1. **Session Persistence**: Save/restore sessions across relay restarts
-2. **DTLS Support**: Optional encryption at transport layer
-3. **NAT Traversal**: STUN/TURN integration for symmetric NAT
-4. **IPv6 Support**: Dual-stack (IPv4 + IPv6)
-5. **Compression**: Optional payload compression for large data
-6. **WebSocket Variant**: Browser client support (Unity WebGL, HTML5 games)
+1. **Save relay state to disk periodically**: Use `SessionState` format for persistence
+2. **Restore sessions on relay restart**: Deserialize `SessionState` on startup
+3. **Configurable persistence backend**: Pluggable storage (file, database, Redis)
+4. **DTLS Support**: Optional encryption at transport layer
+5. **NAT Traversal**: STUN/TURN integration for symmetric NAT
+6. **IPv6 Support**: Dual-stack (IPv4 + IPv6)
+7. **Compression**: Optional payload compression for large data
+8. **WebSocket Variant**: Browser client support (Unity WebGL, HTML5 games)
 
 ---
 
 ## Appendix: Key Interfaces
 
-### PacketPayload (Sealed Interface)
+### PacketPayload (Extensible Interface)
 
 ```java
-public sealed interface PacketPayload
-    permits ConnectRequest, ConnectAccept, ConnectDeny,
-            SessionConfig, PacketTypeRegistry, Ping, Pong,
-            DisconnectNotice, Ack, ReconnectRequest, GamePacket {
+public interface PacketPayload {
+    byte[] toBytes();
 
-    // Serialization handled by PacketPayload class (static methods)
-    // Each record type is immutable and serializes to ByteBuffer
+    // Built-in record types: ConnectRequest, ConnectAccept, ConnectDeny,
+    // SessionConfig, PacketTypeRegistry, Ping, Pong, DisconnectNotice,
+    // Ack, ReconnectRequest, GamePacket
+
+    // Custom payloads can be registered via PayloadRegistry:
+    // PayloadRegistry.register((byte) 0x20, MyCustomPayload::fromBytes);
 }
 ```
 
@@ -1318,6 +1363,220 @@ public interface PongCallback {
 }
 
 // ... 9 more callback types
+```
+
+### GamePacketRegistry (Typed Packet Registration)
+
+```java
+public final class GamePacketRegistry {
+    // Register a game packet type with metadata and validation
+    public static void register(GamePacketDescriptor descriptor, PayloadDeserializer<?> deserializer);
+
+    // Register additional versions for schema evolution
+    public static void registerVersion(byte packetType, int version, PayloadDeserializer<?> deserializer);
+
+    // Validate payloads against registered constraints
+    public static Optional<String> validatePayload(byte packetType, byte[] payload);
+    public static Optional<String> validatePayload(byte packetType, int subtype, byte[] payload);
+
+    // Query registered types
+    public static Optional<GamePacketDescriptor> getDescriptor(byte packetType);
+    public static Set<Integer> getRegisteredVersions(byte packetType);
+}
+```
+
+### NeonMetrics (Core Metrics)
+
+```java
+public final class NeonMetrics {
+    public static NeonMetrics create();
+
+    // Record activity
+    public void recordPacketSent(int sizeBytes);
+    public void recordPacketReceived(int sizeBytes);
+    public void recordLatency(long latencyMs);
+    public void recordError(String errorType);
+
+    // Get snapshot for monitoring
+    public Snapshot snapshot();
+
+    public record Snapshot(
+        long packetsSent, long packetsReceived, long packetsDropped,
+        long bytesSent, long bytesReceived,
+        double minLatencyMs, double maxLatencyMs, double averageLatencyMs,
+        // ... additional fields
+    ) {
+        public double packetsPerSecond();
+        public double dropRatePercent();
+    }
+}
+```
+
+### RuntimeConfig (Hot-Reload Configuration)
+
+```java
+public final class RuntimeConfig {
+    public static RuntimeConfig create();
+    public static RuntimeConfig fromNeonConfig(NeonConfig config);
+
+    // Get/set values with type safety
+    public int getInt(String key);
+    public void setInt(String key, int value);
+    // ... boolean, long, String variants
+
+    // React to changes
+    public void addListener(String key, ConfigChangeListener listener);
+
+    // Persistence
+    public void loadFromFile(Path path) throws IOException;
+    public void saveToFile(Path path) throws IOException;
+
+    // Convert to NeonConfig
+    public NeonConfig toNeonConfig();
+}
+```
+
+### VersionMismatchHandler (Version Compatibility)
+
+```java
+public final class VersionMismatchHandler {
+    public static VersionMismatchHandler create();
+    public static VersionMismatchHandler strict();
+    public static VersionMismatchHandler lenient(byte minVersion, byte maxVersion);
+
+    // Check version compatibility
+    public Result check(byte version);
+    public void validate(byte version) throws VersionMismatchException;
+
+    // Configure behavior
+    public VersionMismatchHandler onMismatch(BiConsumer<Byte, Byte> listener);
+
+    public record Result(
+        byte receivedVersion, byte expectedVersion,
+        boolean isAccepted, SuggestedAction suggestedAction
+    ) {}
+
+    public enum ActionType { UPGRADE_REQUIRED, DOWNGRADE_SUGGESTED, INCOMPATIBLE }
+}
+```
+
+### Lifecycle (Component Lifecycle)
+
+```java
+public interface Lifecycle {
+    enum State { CREATED, STARTING, RUNNING, STOPPING, STOPPED, FAILED }
+
+    State getState();
+    void start();
+    void stop();
+
+    default boolean isRunning() { return getState() == State.RUNNING; }
+    default boolean isTerminated() {
+        State s = getState();
+        return s == State.STOPPED || s == State.FAILED;
+    }
+
+    void addStateChangeListener(StateChangeListener listener);
+    void removeStateChangeListener(StateChangeListener listener);
+
+    @FunctionalInterface
+    interface StateChangeListener {
+        void onStateChange(State oldState, State newState, Throwable cause);
+    }
+}
+```
+
+### Transport (Transport Layer)
+
+```java
+public interface Transport extends AutoCloseable {
+    enum Type { UDP, TCP, QUIC }
+
+    Type getType();
+    void bind(int port) throws IOException;
+    SocketAddress getLocalAddress();
+    void send(byte[] data, SocketAddress address) throws IOException;
+    ReceivedData receive() throws IOException;
+    void setBlocking(boolean blocking) throws IOException;
+    void setTimeout(int timeoutMs) throws IOException;
+    boolean isClosed();
+
+    record ReceivedData(byte[] data, SocketAddress source) {}
+}
+```
+
+### StructuredLogger (Structured Logging)
+
+```java
+public final class StructuredLogger {
+    public static StructuredLogger getLogger(String name);
+    public static void setJsonEnabled(boolean enabled);
+    public static void setOutput(Consumer<String> output);
+
+    public StructuredLogger withContext(String key, Object value);
+
+    public LogEntry info(String message);
+    public LogEntry warn(String message);
+    public LogEntry error(String message);
+
+    public class LogEntry {
+        public LogEntry with(String key, Object value);
+        public LogEntry withException(Throwable t);
+        public void log();
+    }
+}
+```
+
+### Backpressure (Flow Control)
+
+```java
+public final class Backpressure {
+    public static Backpressure create();
+
+    public Backpressure setHighWaterMark(int mark);
+    public Backpressure setLowWaterMark(int mark);
+    public Backpressure addListener(Listener listener);
+
+    public int recordEnqueue();
+    public int recordDequeue();
+    public void recordDrop();
+    public boolean shouldPause();
+    public Signal getCurrentSignal();
+    public State getState();
+
+    public enum Signal { NORMAL, WARNING, CRITICAL, RECOVERED }
+
+    public record State(int currentDepth, int highWaterMark, /* ... */) {
+        public boolean shouldPause();
+        public double fillRatio();
+    }
+
+    @FunctionalInterface
+    interface Listener {
+        void onSignalChange(Signal signal, State state);
+    }
+}
+```
+
+### SessionState (Session Persistence)
+
+```java
+public final class SessionState {
+    public static Builder builder(int sessionId);
+    public static SessionState fromBytes(byte[] data);
+    public static SessionState fromStream(InputStream in) throws IOException;
+
+    public byte[] toBytes();
+    public void toStream(OutputStream out) throws IOException;
+
+    public int getSessionId();
+    public long getHostToken();
+    public List<ClientState> getClients();
+    public byte[] getCustomData();
+
+    public record ClientState(byte clientId, long token, String name,
+                              Instant connectedAt, boolean isHost) {}
+}
 ```
 
 ---

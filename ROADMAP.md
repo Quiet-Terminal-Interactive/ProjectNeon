@@ -1,20 +1,20 @@
 # Project Neon - Roadmap
 
-- [ ] Full-size receive buffers + enforcement
-- [ ] Honest relay semantics
-- [ ] Unsealed payload architecture
-- [ ] Centralized ACK state machine
-- [ ] Event-driven receive loop (no sleep polling)
-- [ ] Game packet registry + subtype/version/validation
-- [ ] Core metrics
-- [ ] Runtime configuration
-- [ ] Payload size enforcement
-- [ ] Explicit version mismatch handling
-- [ ] Clean start/stop lifecycle
-- [ ] Transport interface
-- [ ] Structured logging
-- [ ] Better backpressure signals
-- [ ] Design session state serialization format
+- [x] Full-size receive buffers + enforcement
+- [x] Honest relay semantics
+- [x] Unsealed payload architecture
+- [x] Centralized ACK state machine
+- [x] Event-driven receive loop (no sleep polling)
+- [x] Game packet registry + subtype/version/validation
+- [x] Core metrics
+- [x] Runtime configuration
+- [x] Payload size enforcement
+- [x] Explicit version mismatch handling
+- [x] Clean start/stop lifecycle
+- [x] Transport interface
+- [x] Structured logging
+- [x] Better backpressure signals
+- [x] Design session state serialization format
 - [ ] Save relay state to disk periodically
 - [ ] Restore sessions on relay restart
 - [ ] Configurable persistence backend
@@ -55,5 +55,5 @@ See individual issues for each task. Priority labels:
 
 ---
 
-**Last Updated:** 14-01-2026
+**Last Updated:** 17-01-2026
 **Maintained by:** Kohan Mathers

@@ -1,12 +1,12 @@
 # Project Neon Protocol Specification
 
-![Version](https://img.shields.io/badge/version-0.2.0-blue.svg)
+![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)
 ![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)
 ![Java](https://img.shields.io/badge/java-21+-orange.svg)
 ![License](https://img.shields.io/badge/license-TBD-lightgrey.svg)
 ![Coverage](https://img.shields.io/badge/coverage-80%25-green.svg)
 
-**Version:** 1.0.0
+**Version:** 1.1.0
 **Author:** Kohan Mathers
 **API Documentation:** [JavaDoc](https://quietterminal.github.io/ProjectNeon/)
 
@@ -263,7 +263,7 @@ Project Neon is now implemented in **Java 21** with full Maven support.
 
 ```bash
 # Clone the repository
-git clone https://github.com/QuietTerminal/ProjectNeon
+git clone https://github.com/Quiet-Terminal-interactive/ProjectNeon
 cd ProjectNeon
 
 # Build with Maven
@@ -273,7 +273,7 @@ mvn clean package
 # - neon-relay.jar (relay server)
 # - neon-host.jar (example host)
 # - neon-client.jar (example client)
-# - project-neon-0.2.0.jar (library for integration)
+# - project-neon-1.1.0.jar (library for integration)
 ```
 
 ### Running the Components
@@ -323,13 +323,13 @@ Add Project Neon to your Java project:
 <dependency>
     <groupId>com.quietterminal</groupId>
     <artifactId>project-neon</artifactId>
-    <version>0.2.0</version>
+    <version>1.1.0</version>
 </dependency>
 ```
 
 **Gradle:**
 ```gradle
-implementation 'com.quietterminal:project-neon:0.2.0'
+implementation 'com.quietterminal:project-neon:1.1.0'
 ```
 
 **Example Usage:**
@@ -453,7 +453,7 @@ For integrating with C/C++ applications (Unreal Engine, Unity, custom engines):
 **Required Files:**
 - `libneon_jni.so` (Linux) / `neon_jni.dll` (Windows) / `libneon_jni.dylib` (macOS)
 - `project_neon.h` (located in `src/main/native/`)
-- `project-neon-0.2.0.jar`
+- `project-neon-1.1.0.jar`
 
 **Building JNI Library:**
 
@@ -563,7 +563,7 @@ Project Neon has **no authentication mechanism**:
 
 ### Denial of Service Protection
 
-Project Neon includes basic DoS protections (as of v0.2.0):
+Project Neon includes basic DoS protections (as of v1.1.0):
 
 - Per-client rate limiting (configurable packets per second)
 - Maximum connections per session
@@ -584,7 +584,7 @@ Project Neon includes basic DoS protections (as of v0.2.0):
 
 ### Input Validation
 
-Project Neon validates core protocol inputs (as of v0.2.0):
+Project Neon validates core protocol inputs (as of v1.1.0):
 
 - Buffer overflow protection on all packet types
 - String length limits (names, descriptions)
@@ -870,7 +870,7 @@ Solutions:
 If you're still stuck:
 
 1. **Check Logs**: Enable detailed logging with `java.util.logging` level FINE or ALL
-2. **Check GitHub Issues**: https://github.com/QuietTerminal/ProjectNeon/issues
+2. **Check GitHub Issues**: https://github.com/Quiet-Terminal-interactive/ProjectNeon/issues
 3. **Consult Documentation**: Read [ARCHITECTURE.md](ARCHITECTURE.md) for design details
 4. **Ask Questions**: Open a GitHub discussion or issue
 5. **Email Support**: kohanmathersmcgonnell@gmail.com
@@ -895,7 +895,7 @@ A: Project Neon is for developers who want:
 If you need high-level features like automatic state sync, use a game networking library instead.
 
 **Q: Is Project Neon production-ready?**
-A: Project Neon is currently **v0.2.0 (Beta)**. It has comprehensive tests and security hardening, but is not yet 1.0. See [ROADMAP.md](ROADMAP.md) for status. Use in production at your own risk.
+A: Project Neon is currently **v1.1.0 (Beta)**. It has comprehensive tests and security hardening, but is not yet 1.0. See [ROADMAP.md](ROADMAP.md) for status. Use in production at your own risk.
 
 **Q: What license is Project Neon?**
 A: [License not yet specified - see issue #TODO]

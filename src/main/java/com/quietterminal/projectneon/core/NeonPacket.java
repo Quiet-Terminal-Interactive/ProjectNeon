@@ -21,6 +21,11 @@ public record NeonPacket(PacketHeader header, PacketPayload payload) {
 
     /**
      * Deserializes a packet from bytes.
+     *
+     * <p>For core packet types (0x01-0x0F), uses built-in deserializers.
+     * For game packet types (>= 0x10), checks the {@link PayloadRegistry} for
+     * custom deserializers. If no custom deserializer is registered, falls back
+     * to {@link PacketPayload.GamePacket} which preserves raw bytes.
      */
     public static NeonPacket fromBytes(byte[] bytes) {
         if (bytes.length < PacketHeader.HEADER_SIZE) {
@@ -30,8 +35,18 @@ public record NeonPacket(PacketHeader header, PacketPayload payload) {
         PacketHeader header = PacketHeader.fromBytes(bytes);
         byte[] payloadBytes = Arrays.copyOfRange(bytes, PacketHeader.HEADER_SIZE, bytes.length);
 
-        PacketType type = PacketType.fromByte(header.packetType());
-        PacketPayload payload = switch (type) {
+        PacketPayload payload = deserializePayload(header.packetType(), payloadBytes);
+        return new NeonPacket(header, payload);
+    }
+
+    private static PacketPayload deserializePayload(byte packetType, byte[] payloadBytes) {
+        var customDeserializer = PayloadRegistry.getDeserializer(packetType);
+        if (customDeserializer.isPresent()) {
+            return customDeserializer.get().fromBytes(payloadBytes);
+        }
+
+        PacketType type = PacketType.fromByte(packetType);
+        return switch (type) {
             case CONNECT_REQUEST -> PacketPayload.ConnectRequest.fromBytes(payloadBytes);
             case CONNECT_ACCEPT -> PacketPayload.ConnectAccept.fromBytes(payloadBytes);
             case CONNECT_DENY -> PacketPayload.ConnectDeny.fromBytes(payloadBytes);
@@ -44,8 +59,6 @@ public record NeonPacket(PacketHeader header, PacketPayload payload) {
             case RECONNECT_REQUEST -> PacketPayload.ReconnectRequest.fromBytes(payloadBytes);
             case GAME_PACKET -> PacketPayload.GamePacket.fromBytes(payloadBytes);
         };
-
-        return new NeonPacket(header, payload);
     }
 
     /**
