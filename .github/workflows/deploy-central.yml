@@ -73,9 +73,10 @@ jobs:
           echo "allow-loopback-pinentry" > ~/.gnupg/gpg-agent.conf
           echo "pinentry-mode loopback" > ~/.gnupg/gpg.conf
           gpgconf --kill gpg-agent || true
+          gpg-agent --daemon --allow-loopback-pinentry
 
       - name: Import GPG signing key
-        run: echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --batch --import
+        run: echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --batch --yes --pinentry-mode loopback --import
 
       - name: Build, sign, and publish to Maven Central
         run: |
