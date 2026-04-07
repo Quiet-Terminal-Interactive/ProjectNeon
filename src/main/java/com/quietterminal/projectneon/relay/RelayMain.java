@@ -34,7 +34,7 @@ class RelayMain {
             System.out.println("Press Ctrl+C to exit.\n");
 
             try (NeonRelay relay = new NeonRelay(bindAddress)) {
-                relay.start();
+                relay.startAndRun();
             }
 
         } catch (Exception e) {
