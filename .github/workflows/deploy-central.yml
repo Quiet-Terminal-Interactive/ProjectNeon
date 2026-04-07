@@ -1,0 +1,103 @@
+name: Deploy to Maven Central
+
+on:
+  issues:
+    types: [opened, labeled]
+
+jobs:
+  deploy:
+    name: Release to Maven Central
+    runs-on: ubuntu-latest
+    if: >
+      github.event.issue.title == 'Deploy to Central' &&
+      contains(github.event.issue.labels.*.name, 'CI')
+    permissions:
+      contents: write
+      issues: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Cache Maven local repository
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('pom.xml') }}
+          restore-keys: ${{ runner.os }}-maven-
+
+      - name: Validate release secrets
+        run: |
+          required=(
+            MAVEN_CENTRAL_USERNAME
+            MAVEN_CENTRAL_PASSWORD
+            GPG_PRIVATE_KEY
+            GPG_PASSPHRASE
+            GPG_KEY_ID
+          )
+          for name in "${required[@]}"; do
+            if [ -z "${!name}" ]; then
+              echo "ERROR: Missing required secret: $name"
+              exit 1
+            fi
+          done
+        env:
+          MAVEN_CENTRAL_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          MAVEN_CENTRAL_PASSWORD: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+          GPG_KEY_ID: ${{ secrets.GPG_KEY_ID }}
+
+      - name: Configure Maven settings (Central Portal)
+        uses: s4u/maven-settings-action@v3.0.0
+        with:
+          servers: |
+            [{
+              "id": "central",
+              "username": "${{ secrets.MAVEN_CENTRAL_USERNAME }}",
+              "password": "${{ secrets.MAVEN_CENTRAL_PASSWORD }}"
+            }]
+
+      - name: Configure GPG for headless signing
+        run: |
+          mkdir -p ~/.gnupg
+          chmod 700 ~/.gnupg
+          echo "allow-loopback-pinentry" > ~/.gnupg/gpg-agent.conf
+          echo "pinentry-mode loopback" > ~/.gnupg/gpg.conf
+          gpgconf --kill gpg-agent || true
+
+      - name: Import GPG signing key
+        run: echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --batch --import
+
+      - name: Build, sign, and publish to Maven Central
+        run: |
+          mvn deploy \
+            -DskipTests \
+            -Dgpg.keyname="${{ secrets.GPG_KEY_ID }}"
+        env:
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+
+      - name: Comment on issue with result
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const success = '${{ job.status }}' === 'success';
+            const version = '${{ github.ref_name }}';
+            const body = success
+              ? `Deployment succeeded. \`com.quietterminal:project-neon\` has been published to Maven Central.`
+              : `Deployment failed. Check the [workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) for details.`;
+            github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body
+            });
