@@ -81,7 +81,8 @@ jobs:
         run: |
           mvn deploy \
             -DskipTests \
-            -Dgpg.keyname="${{ secrets.GPG_KEY_ID }}"
+            -Dgpg.keyname="${{ secrets.GPG_KEY_ID }}" \
+            -Dgpg.pinentryMode=loopback
         env:
           MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
 
