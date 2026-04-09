@@ -29,7 +29,7 @@ class HostMain {
                     sessionId = Integer.parseInt(args[0]);
                 } catch (NumberFormatException e) {
                     logger.log(Level.SEVERE, "Invalid session ID argument: {0}", args[0]);
-                    System.err.println("Invalid session ID. Usage: java HostMain [sessionId]");
+                    System.err.println("Invalid session ID. Usage: java -jar neon-host.jar [sessionId] [relayAddr]");
                     return;
                 }
             } else {
@@ -37,7 +37,7 @@ class HostMain {
                 System.out.println("No session ID provided, using random: " + sessionId);
             }
 
-            String relayAddr = "127.0.0.1:7777";
+            String relayAddr = args.length > 1 ? args[1] : "127.0.0.1:7777";
 
             try (NeonHost host = new NeonHost(sessionId, relayAddr)) {
                 host.setClientConnectCallback((clientId, name, session) ->
@@ -64,7 +64,7 @@ class HostMain {
                 System.out.println("\nHost running. Waiting for clients...");
                 System.out.println("Press Ctrl+C to exit.\n");
 
-                host.start();
+                host.startAndRun();
 
             } catch (Exception e) {
                 logger.log(Level.SEVERE, "Host error [SessionID=" + sessionId + "]", e);

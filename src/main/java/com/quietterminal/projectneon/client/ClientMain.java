@@ -24,28 +24,48 @@ class ClientMain {
             System.out.println("=== Project Neon Client ===");
             System.out.println();
 
-            System.out.print("Enter your name: ");
-            String name = scanner.nextLine().trim();
+            String name;
+            if (args.length > 0) {
+                name = args[0].trim();
+            } else {
+                System.out.print("Enter your name: ");
+                name = scanner.nextLine().trim();
+            }
             if (name.isEmpty()) {
                 logger.log(Level.SEVERE, "Name cannot be empty");
                 System.err.println("Name cannot be empty");
                 return;
             }
 
-            System.out.print("Enter session ID: ");
             int sessionId;
-            try {
-                sessionId = Integer.parseInt(scanner.nextLine().trim());
-            } catch (NumberFormatException e) {
-                logger.log(Level.SEVERE, "Invalid session ID provided", e);
-                System.err.println("Invalid session ID");
-                return;
+            if (args.length > 1) {
+                try {
+                    sessionId = Integer.parseInt(args[1]);
+                } catch (NumberFormatException e) {
+                    logger.log(Level.SEVERE, "Invalid session ID argument: {0}", args[1]);
+                    System.err.println("Invalid session ID. Usage: java -jar neon-client.jar [name] [sessionId] [relayAddr]");
+                    return;
+                }
+            } else {
+                System.out.print("Enter session ID: ");
+                try {
+                    sessionId = Integer.parseInt(scanner.nextLine().trim());
+                } catch (NumberFormatException e) {
+                    logger.log(Level.SEVERE, "Invalid session ID provided", e);
+                    System.err.println("Invalid session ID");
+                    return;
+                }
             }
 
-            System.out.print("Enter relay address (host:port, default 127.0.0.1:7777): ");
-            String relayAddr = scanner.nextLine().trim();
-            if (relayAddr.isEmpty()) {
-                relayAddr = "127.0.0.1:7777";
+            String relayAddr;
+            if (args.length > 2) {
+                relayAddr = args[2].trim();
+            } else {
+                System.out.print("Enter relay address (host:port, default 127.0.0.1:7777): ");
+                relayAddr = scanner.nextLine().trim();
+                if (relayAddr.isEmpty()) {
+                    relayAddr = "127.0.0.1:7777";
+                }
             }
 
             try (NeonClient client = new NeonClient(name)) {

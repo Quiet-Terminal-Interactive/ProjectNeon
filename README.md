@@ -1,12 +1,12 @@
 # Project Neon Protocol Specification
 
-![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)
+![Version](https://img.shields.io/badge/version-1.2.1-blue.svg)
 ![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)
 ![Java](https://img.shields.io/badge/java-21+-orange.svg)
 ![License](https://img.shields.io/badge/license-TBD-lightgrey.svg)
 ![Coverage](https://img.shields.io/badge/coverage-80%25-green.svg)
 
-**Version:** 1.1.0
+**Version:** 1.2.1
 **Author:** Kohan Mathers
 **API Documentation:** [JavaDoc](https://quietterminal.github.io/ProjectNeon/)
 
@@ -273,7 +273,7 @@ mvn clean package
 # - neon-relay.jar (relay server)
 # - neon-host.jar (example host)
 # - neon-client.jar (example client)
-# - project-neon-1.1.0.jar (library for integration)
+# - project-neon-1.2.1.jar (library for integration)
 ```
 
 ### Running the Components
@@ -294,25 +294,43 @@ mvn exec:java@relay
 #### Host
 
 ```bash
-# Run host with auto-generated session ID
+# Run host with auto-generated session ID (connects to relay at 127.0.0.1:7777)
 java -jar target/neon-host.jar
 
-# Or specify a session ID
+# Specify a session ID
 java -jar target/neon-host.jar 12345
+
+# Specify a session ID and a custom relay address
+java -jar target/neon-host.jar 12345 192.168.1.10:7777
 
 # Or use Maven exec plugin
 mvn exec:java@host
 ```
 
+**Host arguments:** `[sessionId] [relayAddr]`
+- `sessionId` — integer session ID (default: random)
+- `relayAddr` — relay address as `host:port` (default: `127.0.0.1:7777`)
+
 #### Client
 
 ```bash
-# Run interactive client
+# Run interactive client (prompts for name, session ID, and relay address)
 java -jar target/neon-client.jar
+
+# Supply all arguments non-interactively
+java -jar target/neon-client.jar Alice 12345 192.168.1.10:7777
+
+# Supply name and session ID only (uses default relay 127.0.0.1:7777)
+java -jar target/neon-client.jar Alice 12345
 
 # Or use Maven exec plugin
 mvn exec:java@client
 ```
+
+**Client arguments:** `[name] [sessionId] [relayAddr]`
+- `name` — display name (prompted if omitted)
+- `sessionId` — integer session ID (prompted if omitted)
+- `relayAddr` — relay address as `host:port` (prompted if omitted, default: `127.0.0.1:7777`)
 
 ### Java Integration
 
@@ -323,13 +341,13 @@ Add Project Neon to your Java project:
 <dependency>
     <groupId>com.quietterminal</groupId>
     <artifactId>project-neon</artifactId>
-    <version>1.1.0</version>
+    <version>1.2.1</version>
 </dependency>
 ```
 
 **Gradle:**
 ```gradle
-implementation 'com.quietterminal:project-neon:1.1.0'
+implementation 'com.quietterminal:project-neon:1.2.1'
 ```
 
 **Example Usage:**
@@ -453,7 +471,7 @@ For integrating with C/C++ applications (Unreal Engine, Unity, custom engines):
 **Required Files:**
 - `libneon_jni.so` (Linux) / `neon_jni.dll` (Windows) / `libneon_jni.dylib` (macOS)
 - `project_neon.h` (located in `src/main/native/`)
-- `project-neon-1.1.0.jar`
+- `project-neon-1.2.1.jar`
 
 **Building JNI Library:**
 
@@ -895,7 +913,7 @@ A: Project Neon is for developers who want:
 If you need high-level features like automatic state sync, use a game networking library instead.
 
 **Q: Is Project Neon production-ready?**
-A: Project Neon is currently **v1.1.0 (Beta)**. It has comprehensive tests and security hardening, but is not yet 1.0. See [ROADMAP.md](ROADMAP.md) for status. Use in production at your own risk.
+A: Project Neon is currently **v1.2.1 (Beta)**. It is suitable for production, but not yet hardened. Use at your own risk.
 
 **Q: What license is Project Neon?**
 A: [License not yet specified - see issue #TODO]
