@@ -136,21 +136,23 @@ mvn javadoc:javadoc
 
 ## Architecture
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for a full description of the relay topology,
+See [ARCHITECTURE.md](ARCHITECTURE.md) for a full description of the relay topology,
 session lifecycle, and reconnect flow.
 
-See [docs/PROTOCOL.md](docs/PROTOCOL.md) for the wire format specification.
+See [PROTOCOL.md](PROTOCOL.md) for the wire format specification.
 
-See [docs/CONFIGURATION.md](docs/CONFIGURATION.md) for the complete `NeonConfig` reference.
+See [CONFIGURATION.md](CONFIGURATION.md) for the complete `NeonConfig` reference.
+
+See the [javadocs](https://neon-jd.quietterminal.co.uk) for everything else.
 
 ## Client IDs
 
-| ID | Role |
-|----|------|
-| `0` | Broadcast / unassigned |
-| `1` | Host |
-| `2–254` | Connected clients |
-| `255` | Reserved |
+| ID      | Role                   |
+| ------- | ---------------------- |
+| `0`     | Broadcast / unassigned |
+| `1`     | Host                   |
+| `2–254` | Connected clients      |
+| `255`   | Reserved               |
 
 ## License
 
