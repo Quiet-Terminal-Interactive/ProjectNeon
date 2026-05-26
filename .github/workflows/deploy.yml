@@ -59,12 +59,7 @@ jobs:
       - name: Configure Maven settings (Central Portal)
         uses: s4u/maven-settings-action@v3.0.0
         with:
-          servers: |
-            [{
-              "id": "central",
-              "username": "${{ secrets.MAVEN_CENTRAL_USERNAME }}",
-              "password": "${{ secrets.MAVEN_CENTRAL_PASSWORD }}"
-            }]
+          servers: '[{"id":"central","username":"${{ secrets.MAVEN_CENTRAL_USERNAME }}","password":"${{ secrets.MAVEN_CENTRAL_PASSWORD }}"}]'
 
       - name: Configure GPG for headless signing
         run: |
