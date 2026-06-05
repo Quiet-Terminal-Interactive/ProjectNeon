@@ -19,20 +19,20 @@ Offset  Size  Field
 
 ## Packet Types
 
-| Byte   | Name                 | Sender  | Description |
-|--------|----------------------|---------|-------------|
-| `0x01` | `CONNECT_REQUEST`    | Client  | Join a session |
-| `0x02` | `CONNECT_ACCEPT`     | Relay / Host | Connection approved |
-| `0x03` | `CONNECT_DENY`       | Relay / Host | Connection rejected |
-| `0x04` | `SESSION_CONFIG`     | Host    | Tick rate, max packet size (reliably delivered) |
-| `0x05` | `PACKET_TYPE_REGISTRY` | Host  | Advertise game packet type names |
-| `0x06` | `HOST_REGISTER`      | Host    | Register a new session with the relay |
-| `0x0B` | `PING`               | Any     | Keepalive request |
-| `0x0C` | `PONG`               | Any     | Keepalive response |
-| `0x0D` | `DISCONNECT_NOTICE`  | Any     | Clean disconnect notification |
-| `0x0E` | `ACK`                | Client  | Acknowledge reliably-delivered packets |
-| `0x0F` | `RECONNECT_REQUEST`  | Client  | Rejoin with session token |
-| `0x10+` | `GAME_PACKET`       | Any     | Application-defined; type byte ≥ 0x10 |
+| Byte    | Name                   | Sender       | Description                                     |
+| ------- | ---------------------- | ------------ | ----------------------------------------------- |
+| `0x01`  | `CONNECT_REQUEST`      | Client       | Join a session                                  |
+| `0x02`  | `CONNECT_ACCEPT`       | Relay / Host | Connection approved                             |
+| `0x03`  | `CONNECT_DENY`         | Relay / Host | Connection rejected                             |
+| `0x04`  | `SESSION_CONFIG`       | Host         | Tick rate, max packet size (reliably delivered) |
+| `0x05`  | `PACKET_TYPE_REGISTRY` | Host         | Advertise game packet type names                |
+| `0x06`  | `HOST_REGISTER`        | Host         | Register a new session with the relay           |
+| `0x0B`  | `PING`                 | Any          | Keepalive request                               |
+| `0x0C`  | `PONG`                 | Any          | Keepalive response                              |
+| `0x0D`  | `DISCONNECT_NOTICE`    | Any          | Clean disconnect notification                   |
+| `0x0E`  | `ACK`                  | Any          | Acknowledge reliably-delivered packets          |
+| `0x0F`  | `RECONNECT_REQUEST`    | Client       | Rejoin with session token                       |
+| `0x10+` | `GAME_PACKET`          | Any          | Application-defined; type byte ≥ 0x10           |
 
 ## Connection Flow
 
@@ -80,7 +80,10 @@ Client (new addr)     Relay                 Host
   │         [session resumed]                 │
 ```
 
-If the host sends `CONNECT_DENY` instead, the relay discards the buffered address and the client's old mapping is preserved.
+If the host sends `CONNECT_DENY` instead, the current relay does not attach that denial to the
+buffered reconnect attempt. The denial is routed like any other packet and may be dropped as
+unroutable if the old client mapping has already been removed. The buffered reconnect address is
+discarded later by relay cleanup.
 
 ## Disconnect Flow
 
@@ -90,16 +93,16 @@ Client                Relay                 Host / Peers
   │──DISCONNECT_NOTICE──►│                     │
   │                     │──DISCONNECT_NOTICE──►│  (broadcast to all session peers)
   │                     │                     │
-  │      [session slot freed; token retained for reconnect window]
+  │      [relay slot freed; host retains token for reconnect window]
 ```
 
 ## Routing Rules (Relay)
 
-| Destination ID | Action |
-|----------------|--------|
+| Destination ID | Action                                       |
+| -------------- | -------------------------------------------- |
 | `0`            | Broadcast to all session peers except sender |
-| `1`            | Unicast to host |
-| `2-254`        | Unicast to that client |
+| `1`            | Unicast to host                              |
+| `2-255`        | Unicast to that client, if registered        |
 
 Packets for an unknown destination are silently discarded and logged at `FINE`.
 
@@ -140,11 +143,16 @@ Sequence numbers are unsigned 16-bit integers that wrap `65535 → 0`. Duplicate
 
 ## Rate Limiting
 
-The relay enforces a per-source packet rate limit (default 100 pps). Sources exceeding this limit are silently dropped. After 10 consecutive violations the source is considered throttled.
+The relay enforces a per-source packet rate limit (default 100 pps). Sources exceeding this limit are
+silently dropped and logged at `FINE`. `RateLimiter` tracks violations and reports throttled after
+more than 10 violations, but the relay currently does not apply separate behavior for throttled
+sources beyond continuing to drop packets while tokens are exhausted.
 
 ## Reliable Delivery
 
-Only `SESSION_CONFIG` uses reliability by default. Reliability is opt-in for game packets via `ReliablePacketManager`:
+Only `SESSION_CONFIG` uses reliability by default. Its retransmission is host-managed with
+`AckStateMachine`, and clients automatically ACK received `SESSION_CONFIG` packets. Reliability is
+also opt-in for game packets via `ReliablePacketManager`:
 
 - Sender tracks unACKed packets with a timeout
 - On timeout: retransmit (up to `reliablePacketMaxRetries` times)
