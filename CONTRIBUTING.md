@@ -33,6 +33,17 @@ Any new packet type must be added to all implementations to maintain interoperab
 
 </details>
 
+<details>
+<summary>Python</summary>
+
+1. Add a member to `PacketType` in `_protocol.py` with its byte value
+2. Add a `@dataclass(frozen=True)` with `to_bytes()` and `from_bytes(data)` class methods
+3. Add a `case` branch to `NeonPacket.from_bytes()` for the new type
+4. Handle it in `NeonRelay._handle_packet()`, `NeonHost._handle_packet()`, or `NeonClient._handle_packet()` as appropriate
+5. Add tests
+
+</details>
+
 ## Requirements
 
 <details>
@@ -40,6 +51,17 @@ Any new packet type must be added to all implementations to maintain interoperab
 
 - Java 25 (OpenJDK 25.0.2+)
 - Maven 3.9+
+
+</details>
+
+<details>
+<summary>Python</summary>
+
+- Python 3.11+
+- pip / a virtual environment
+
+Optional for DTLS:
+- `pyopenssl>=23.0` (`pip install qti-neon[dtls]`)
 
 </details>
 
@@ -53,6 +75,23 @@ mvn verify
 ```
 
 This compiles, runs all tests, generates Javadoc, and enforces code coverage.
+
+</details>
+
+<details>
+<summary>Python</summary>
+
+```bash
+cd python
+pip install -e ".[dev]"
+```
+
+Generate docs:
+
+```bash
+pdoc src/qti_neon --output-dir ../docs/python
+# output: ../docs/python/qti_neon.html
+```
 
 </details>
 
@@ -92,6 +131,42 @@ Tests are split by concern:
 
 </details>
 
+<details>
+<summary>Python</summary>
+
+Most tests open real UDP sockets on loopback. Run them in a terminal — not in a sandboxed IDE runner:
+
+```bash
+cd python
+pytest
+```
+
+Run a specific test file:
+
+```bash
+pytest tests/test_host.py
+```
+
+Run only the integration tests:
+
+```bash
+pytest tests/test_integration.py
+```
+
+Tests are split by concern:
+
+| File                  | What it tests                                   |
+| --------------------- | ----------------------------------------------- |
+| `test_protocol.py`    | Packet parsing, serialisation, config           |
+| `test_config.py`      | NeonConfig validation                           |
+| `test_relay.py`       | NeonRelay with raw socket counterparts          |
+| `test_host.py`        | NeonHost with a mock relay                      |
+| `test_client.py`      | NeonClient with a mock relay                    |
+| `test_reliable.py`    | ReliablePacketManager in isolation              |
+| `test_integration.py` | Full stack: relay + host + client over loopback |
+
+</details>
+
 ## Code Style
 
 <details>
@@ -103,5 +178,17 @@ Tests are split by concern:
 - No speculative abstractions — solve the problem in front of you
 - Package-private for implementation classes; `public` only for the API surface
 - One `Logger` per class via `Logger.getLogger(Foo.class.getName())`
+
+</details>
+
+<details>
+<summary>Python</summary>
+
+- Python 3.11+ — use `match`/`case`, `dataclass(frozen=True)`, and `|` union types where natural
+- No `print()` in `src/`
+- No comments that describe *what* the code does — only *why*, when non-obvious
+- No speculative abstractions — solve the problem in front of you
+- Prefix internal classes and functions with `_`; public API only in `__init__.py`
+- One `logger = logging.getLogger(__name__)` per module
 
 </details>

@@ -1,0 +1,32 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "qti-neon"
+version = "1.0.0"
+description = "Minimal, game-agnostic, relay-based UDP multiplayer protocol library"
+readme = "../README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Kohan Mathers" }]
+dependencies = []
+
+[project.optional-dependencies]
+dtls = ["pyopenssl>=23.0"]
+dev = ["pytest>=9.0.3", "pytest-timeout>=2.0", "pdoc>=16.0", "pyopenssl>=23.0"]
+
+[project.urls]
+Homepage = "https://github.com/Quiet-Terminal-Interactive/QTINeon"
+Documentation = "https://quiet-terminal-interactive.github.io/QTINeon/docs/python/"
+Repository = "https://github.com/Quiet-Terminal-Interactive/QTINeon"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/qti_neon"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+timeout = 10
+
+[tool.pdoc]
+output-directory = "../docs/python"

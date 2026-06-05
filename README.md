@@ -53,6 +53,19 @@ Thread.ofVirtual().start(relay::startAndRun);
 
 </details>
 
+<details>
+<summary>Python</summary>
+
+```python
+import threading
+from qti_neon import NeonRelay, NeonConfig
+
+relay = NeonRelay("0.0.0.0", NeonConfig())
+threading.Thread(target=relay.start_and_run, daemon=True).start()
+```
+
+</details>
+
 ### 2. Start a host
 
 <details>
@@ -65,6 +78,21 @@ host.setClientConnectCallback((id, name, sid) ->
 host.setUnhandledPacketCallback((type, from) ->
     handleGamePacket(type, from));
 Thread.ofVirtual().start(() -> host.startAndRun());
+```
+
+</details>
+
+<details>
+<summary>Python</summary>
+
+```python
+import threading
+from qti_neon import NeonHost
+
+host = NeonHost(session_id=42, relay_address="relay.example.com:7777")
+host.set_client_connect_callback(lambda cid, name, sid: on_client_join(cid, name))
+host.set_unhandled_packet_callback(lambda ptype, sender: handle_game_packet(ptype, sender))
+threading.Thread(target=host.start_and_run, daemon=True).start()
 ```
 
 </details>
@@ -88,6 +116,23 @@ if (client.connect(42, "relay.example.com:7777")) {
 
 </details>
 
+<details>
+<summary>Python</summary>
+
+```python
+import threading
+from qti_neon import NeonClient
+
+client = NeonClient("player1")
+client.set_session_config_callback(lambda sc: on_session_config(sc))
+client.set_unhandled_packet_callback(lambda ptype, sender: handle_game_packet(ptype, sender))
+
+if client.connect(session_id=42, relay_address="relay.example.com:7777"):
+    threading.Thread(target=client.run, daemon=True).start()
+```
+
+</details>
+
 ### 4. Send a packet
 
 <details>
@@ -96,6 +141,16 @@ if (client.connect(42, "relay.example.com:7777")) {
 ```java
 byte[] data = encodePosition(x, y, z);
 client.sendPacket(data, PACKET_POSITION, (byte) 0); // 0 = broadcast
+```
+
+</details>
+
+<details>
+<summary>Python</summary>
+
+```python
+data = encode_position(x, y, z)
+client.send_packet(data, PACKET_POSITION, dest_id=0)  # 0 = broadcast
 ```
 
 </details>
@@ -109,6 +164,17 @@ client.sendPacket(data, PACKET_POSITION, (byte) 0); // 0 = broadcast
 client.stop(); // or socket dies ungracefully
 // ...
 boolean ok = client.reconnect(); // uses stored session token
+```
+
+</details>
+
+<details>
+<summary>Python</summary>
+
+```python
+client.stop()  # or socket dies ungracefully
+# ...
+ok = client.reconnect()  # uses stored session token
 ```
 
 </details>
@@ -141,6 +207,23 @@ NeonConfig clientCfg = NeonConfig.builder()
 
 </details>
 
+<details>
+<summary>Python</summary>
+
+```python
+from qti_neon import DtlsConfig, NeonConfig, NeonRelay, NeonClient
+
+# Relay — load certificate and private key
+relay_cfg = NeonConfig(dtls_config=DtlsConfig.from_key_store("relay.crt", "relay.key"))
+relay = NeonRelay("0.0.0.0", relay_cfg)
+
+# Host / Client — trust the relay certificate (or supply a proper trust store)
+client_cfg = NeonConfig(dtls_config=DtlsConfig.insecure_trust_all())  # dev only
+client = NeonClient("player1", client_cfg)
+```
+
+</details>
+
 `insecureTrustAll()` is for development and testing only — it accepts any certificate.
 For production, supply a trust manager that pins the relay's certificate.
 
@@ -157,6 +240,21 @@ When DTLS is not configured (the default), packets are sent in plaintext.
     <artifactId>qti-neon</artifactId>
     <version>1.0.0</version>
 </dependency>
+```
+
+</details>
+
+<details>
+<summary>Python (pip)</summary>
+
+```bash
+pip install qti-neon
+```
+
+With DTLS support:
+
+```bash
+pip install "qti-neon[dtls]"
 ```
 
 </details>
@@ -181,6 +279,24 @@ Generate docs:
 ```bash
 mvn javadoc:javadoc
 # output: target/reports/apidocs/index.html
+```
+
+</details>
+
+<details>
+<summary>Python</summary>
+
+```bash
+cd python
+pip install -e ".[dev]"
+pytest
+```
+
+Generate docs:
+
+```bash
+pdoc src/qti_neon --output-dir ../docs/python
+# output: ../docs/python/qti_neon.html
 ```
 
 </details>
