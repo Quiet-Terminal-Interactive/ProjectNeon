@@ -31,7 +31,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.m2/repository
-          key: ${{ runner.os }}-maven-${{ hashFiles('pom.xml') }}
+          key: ${{ runner.os }}-maven-${{ hashFiles('java/pom.xml') }}
           restore-keys: ${{ runner.os }}-maven-
 
       - name: Validate release secrets
@@ -73,6 +73,7 @@ jobs:
         run: echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --batch --yes --pinentry-mode loopback --import
 
       - name: Build, sign, and publish to Maven Central
+        working-directory: java
         run: |
           mvn deploy \
             -Prelease \
