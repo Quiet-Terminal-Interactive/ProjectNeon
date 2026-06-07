@@ -44,6 +44,23 @@ Any new packet type must be added to all implementations to maintain interoperab
 
 </details>
 
+## Adding a New Language Implementation
+
+New language implementations are always welcome. To be accepted, the implementation must be integrated into `test_compliance.py` and all compliance tests must pass.
+
+Concretely, for a new implementation called `<lang>`:
+
+1. Add host and client script templates (analogous to `_PY_HOST` / `_PY_CLIENT` or the Java runners) that print the same sentinel markers: `HOST_READY`, `HOST_FAILED`, `CLIENT_CONNECTED:<id>:<name>`, `PACKET_RECEIVED:<type>:<sender>`, `CONNECTED:<id>`, `PACKET_SENT`, `CONNECT_FAILED`.
+2. Add a setup step (build, install, create an isolated environment) following the pattern of the Java `mvn install` and Python `venv` steps.
+3. Add two test functions:
+   - `_test_java_host_<lang>_client()` — Java host, new client (use a new session ID constant)
+   - `_test_<lang>_host_java_client()` — new host, Java client (use another new session ID constant)
+4. Call both functions from `main()`, appending failures to the `failures` list.
+5. Add cleanup of any build artifacts or temporary environments in the cleanup step.
+6. Update `CONTRIBUTING.md` with language-specific Requirements, Build, Tests, and Code Style sections.
+
+The Java implementation is the wire-format reference. If the new implementation disagrees with Java on packet framing or session handshake, fix the new implementation — not Java.
+
 ## Requirements
 
 <details>
