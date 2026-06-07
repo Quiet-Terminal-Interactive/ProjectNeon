@@ -12,9 +12,12 @@ Steps
 1. Build + install the Java library to the local Maven cache  (mvn install)
 2. Compile small Java host/client runner programs against the installed JAR
 3. Create a Python venv and install the Python library
-4. Test A  — Java host + Python client: client sends a packet, host logs receipt
-5. Test B  — Python host + Java client: client sends a packet, host logs receipt
-6. Cleanup — remove the Maven artifact and delete the venv + work directory
+4. Build the TypeScript library  (npm install && npm run build)
+5. Test A  — Java host + Python client: client sends a packet, host logs receipt
+6. Test B  — Python host + Java client: client sends a packet, host logs receipt
+7. Test C  — Java host + TypeScript client: client sends a packet, host logs receipt
+8. Test D  — TypeScript host + Java client: client sends a packet, host logs receipt
+9. Cleanup — remove the Maven artifact and delete the venv + work directory
 """
 
 import os
@@ -31,10 +34,14 @@ import venv as _venv
 RELAY     = "neon-relay.quietterminal.co.uk:7777"
 SESSION_A = 9901   # Java host / Python client
 SESSION_B = 9902   # Python host / Java client
+SESSION_C = 9903   # Java host / TypeScript client
+SESSION_D = 9904   # TypeScript host / Java client
 
 BASE_DIR    = os.path.dirname(os.path.abspath(__file__))
 JAVA_DIR    = os.path.join(BASE_DIR, "java")
 PYTHON_DIR  = os.path.join(BASE_DIR, "python")
+JS_TS_DIR   = os.path.join(BASE_DIR, "js-ts")
+JS_TS_DIST  = os.path.join(JS_TS_DIR, "dist")
 WORK_DIR    = os.path.join(BASE_DIR, ".compliance_work")
 VENV_DIR    = os.path.join(BASE_DIR, ".compliance_venv")
 VENV_PYTHON = os.path.join(VENV_DIR, "bin", "python")
@@ -206,6 +213,74 @@ _PY_CLIENT = textwrap.dedent("""\
 """)
 
 
+# TypeScript / Node.js script templates
+# These are written as plain .js files that require the compiled dist output.
+
+_TS_HOST = textwrap.dedent("""\
+    'use strict';
+    const {{ NeonHost }} = require({dist!r});
+
+    const sessionId = parseInt(process.argv[2]);
+    const relay     = process.argv[3];
+
+    const host = new NeonHost(sessionId, relay);
+
+    host.setClientConnectCallback((id, name) => {{
+        console.log('CLIENT_CONNECTED:' + id + ':' + name);
+    }});
+    host.setUnhandledPacketCallback((type, sender) => {{
+        console.log('PACKET_RECEIVED:' + type + ':' + sender);
+    }});
+
+    host.start().then(() => {{
+        console.log('HOST_READY');
+        process.stdin.resume();
+        process.stdin.on('end', () => {{
+            host.stop().then(() => process.exit(0)).catch(() => process.exit(1));
+        }});
+    }}).catch(err => {{
+        console.error('Host start failed: ' + err.message);
+        console.log('HOST_FAILED');
+        process.exit(1);
+    }});
+""")
+
+_TS_CLIENT = textwrap.dedent("""\
+    'use strict';
+    const {{ NeonClient }} = require({dist!r});
+
+    const sessionId = parseInt(process.argv[2]);
+    const relay     = process.argv[3];
+
+    const client = new NeonClient('ts-client');
+    client.setUnhandledPacketCallback((type, sender) => {{
+        console.log('PACKET_RECEIVED:' + type + ':' + sender);
+    }});
+
+    client.connect(sessionId, relay).then(ok => {{
+        if (!ok) {{
+            console.log('CONNECT_FAILED');
+            process.exit(1);
+            return;
+        }}
+        console.log('CONNECTED:' + client.currentClientId);
+
+        setTimeout(() => {{
+            client.sendPacket(Buffer.from([0x42]), 0x10, 1);
+            console.log('PACKET_SENT');
+
+            setTimeout(() => {{
+                if (client.isRunning) client.stop();
+            }}, 1500);
+        }}, 300);
+    }}).catch(err => {{
+        console.error('Connect failed: ' + err.message);
+        console.log('CONNECT_FAILED');
+        process.exit(1);
+    }});
+""")
+
+
 # Helpers
 
 def _section(title: str) -> None:
@@ -343,6 +418,88 @@ def _test_python_host_java_client() -> None:
         raise RuntimeError("Python host did not receive the game packet from Java client")
 
 
+def _test_java_host_ts_client() -> None:
+    _section(f"Test C: Java host  ←→  TypeScript client   (session {SESSION_C})")
+
+    print("  Starting Java host…")
+    host_proc, host_lines = _launch(
+        _java_cmd("NeonHostRunner", str(SESSION_C), RELAY),
+        ready_marker="HOST_READY",
+        timeout=20,
+    )
+
+    print("  Starting TypeScript client…")
+    client_proc, client_lines = _launch(
+        ["node", os.path.join(WORK_DIR, "ts_client.js"), str(SESSION_C), RELAY],
+        ready_marker="PACKET_SENT",
+        timeout=20,
+        use_stdin_pipe=False,
+    )
+
+    time.sleep(2.0)
+    client_proc.wait(timeout=5)
+
+    ok_conn   = any("CLIENT_CONNECTED" in l for l in host_lines)
+    ok_packet = any("PACKET_RECEIVED"  in l for l in host_lines)
+
+    try:
+        host_proc.stdin.close()
+        host_proc.wait(timeout=8)
+    except Exception:
+        host_proc.kill()
+
+    if ok_conn:
+        print(f"  {_PASS}  Java host registered TypeScript client connection")
+    else:
+        print(f"  {_FAIL}  Java host never saw CLIENT_CONNECTED")
+
+    if ok_packet:
+        print(f"  {_PASS}  Java host received game packet from TypeScript client")
+    else:
+        raise RuntimeError("Java host did not receive the game packet from TypeScript client")
+
+
+def _test_ts_host_java_client() -> None:
+    _section(f"Test D: TypeScript host  ←→  Java client   (session {SESSION_D})")
+
+    print("  Starting TypeScript host…")
+    host_proc, host_lines = _launch(
+        ["node", os.path.join(WORK_DIR, "ts_host.js"), str(SESSION_D), RELAY],
+        ready_marker="HOST_READY",
+        timeout=20,
+    )
+
+    print("  Starting Java client…")
+    client_proc, client_lines = _launch(
+        _java_cmd("NeonClientRunner", str(SESSION_D), RELAY),
+        ready_marker="PACKET_SENT",
+        timeout=20,
+        use_stdin_pipe=False,
+    )
+
+    time.sleep(2.0)
+    client_proc.wait(timeout=5)
+
+    ok_conn   = any("CLIENT_CONNECTED" in l for l in host_lines)
+    ok_packet = any("PACKET_RECEIVED"  in l for l in host_lines)
+
+    try:
+        host_proc.stdin.close()
+        host_proc.wait(timeout=8)
+    except Exception:
+        host_proc.kill()
+
+    if ok_conn:
+        print(f"  {_PASS}  TypeScript host registered Java client connection")
+    else:
+        print(f"  {_FAIL}  TypeScript host never saw CLIENT_CONNECTED")
+
+    if ok_packet:
+        print(f"  {_PASS}  TypeScript host received game packet from Java client")
+    else:
+        raise RuntimeError("TypeScript host did not receive the game packet from Java client")
+
+
 # Main
 
 def main() -> int:
@@ -368,6 +525,16 @@ def main() -> int:
     with open(os.path.join(WORK_DIR, "py_host.py"),   "w") as f: f.write(_PY_HOST)
     with open(os.path.join(WORK_DIR, "py_client.py"), "w") as f: f.write(_PY_CLIENT)
 
+    _section("Step 4: Build TypeScript library")
+    _run(["npm", "install", "--prefer-offline"], cwd=JS_TS_DIR)
+    _run(["npm", "run", "build"],                cwd=JS_TS_DIR)
+
+    dist_index = os.path.join(JS_TS_DIST, "index.js")
+    with open(os.path.join(WORK_DIR, "ts_host.js"),   "w") as f:
+        f.write(_TS_HOST.format(dist=dist_index))
+    with open(os.path.join(WORK_DIR, "ts_client.js"), "w") as f:
+        f.write(_TS_CLIENT.format(dist=dist_index))
+
     try:
         _test_java_host_python_client()
     except Exception as e:
@@ -379,6 +546,18 @@ def main() -> int:
     except Exception as e:
         print(f"\n  {_FAIL}  Test B failed: {e}")
         failures.append(f"Test B: {e}")
+
+    try:
+        _test_java_host_ts_client()
+    except Exception as e:
+        print(f"\n  {_FAIL}  Test C failed: {e}")
+        failures.append(f"Test C: {e}")
+
+    try:
+        _test_ts_host_java_client()
+    except Exception as e:
+        print(f"\n  {_FAIL}  Test D failed: {e}")
+        failures.append(f"Test D: {e}")
 
     _section("Step 5: Cleanup")
 

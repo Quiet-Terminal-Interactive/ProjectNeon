@@ -44,6 +44,18 @@ Any new packet type must be added to all implementations to maintain interoperab
 
 </details>
 
+<details>
+<summary>TypeScript</summary>
+
+1. Add a member to the `PacketType` enum in `src/_protocol.ts`
+2. Add a payload interface (e.g. `MyPacketPayload`) and a type guard (`isMyPacket`)
+3. Add serialisation in `serializePacket` and deserialisation in `parsePacket`
+4. Handle it in `NeonRelay._handlePacket()`, `NeonHost._handlePacket()`, or `NeonClient._handlePacket()` as appropriate
+5. Export the new interface and type guard from `src/index.ts`
+6. Add tests
+
+</details>
+
 ## Adding a New Language Implementation
 
 New language implementations are always welcome. To be accepted, the implementation must be integrated into `test_compliance.py` and all compliance tests must pass.
@@ -82,6 +94,17 @@ Optional for DTLS:
 
 </details>
 
+<details>
+<summary>TypeScript</summary>
+
+- Node.js 18+
+- npm 9+
+
+Optional for DTLS:
+- `koffi` (`npm install koffi`) — requires OpenSSL 3 (`libssl.so.3`) on the system
+
+</details>
+
 ## Build
 
 <details>
@@ -108,6 +131,30 @@ Generate docs:
 ```bash
 pdoc src/qti_neon --output-dir ../docs/python
 # output: ../docs/python/qti_neon.html
+```
+
+</details>
+
+<details>
+<summary>TypeScript</summary>
+
+```bash
+cd js-ts
+npm install
+npm run build   # tsc → dist/
+```
+
+Generate docs:
+
+```bash
+npm run docs
+# output: ../docs/ts/index.html
+```
+
+To install DTLS support:
+
+```bash
+npm install koffi
 ```
 
 </details>
@@ -184,6 +231,34 @@ Tests are split by concern:
 
 </details>
 
+<details>
+<summary>TypeScript</summary>
+
+Tests open real UDP sockets on loopback. Run them in a terminal — not in a sandboxed IDE runner:
+
+```bash
+cd js-ts
+npm test
+```
+
+Run a specific test file:
+
+```bash
+npx vitest run tests/host.test.ts
+```
+
+Tests are split by concern:
+
+| File                   | What it tests                                   |
+| ---------------------- | ----------------------------------------------- |
+| `protocol.test.ts`     | Packet parsing, serialisation, wire bytes       |
+| `relay.test.ts`        | NeonRelay with raw socket counterparts          |
+| `host.test.ts`         | NeonHost with a mock relay                      |
+| `client.test.ts`       | NeonClient with a mock relay                    |
+| `integration.test.ts`  | Full stack: relay + host + client over loopback |
+
+</details>
+
 ## Code Style
 
 <details>
@@ -207,5 +282,18 @@ Tests are split by concern:
 - No speculative abstractions — solve the problem in front of you
 - Prefix internal classes and functions with `_`; public API only in `__init__.py`
 - One `logger = logging.getLogger(__name__)` per module
+
+</details>
+
+<details>
+<summary>TypeScript</summary>
+
+- TypeScript strict mode; `ES2022` target, CommonJS output
+- No `console.log` in `src/` (use `emit('error', ...)` for runtime errors)
+- No comments that describe *what* the code does — only *why*, when non-obvious
+- No speculative abstractions — solve the problem in front of you
+- Prefix internal modules with `_` (e.g. `_protocol.ts`, `_socket.ts`); public API only in `index.ts`
+- Use `bigint` for all wire-format 64-bit integer fields (token, timestamp); never `number`
+- Async entry points (`start()`, `connect()`) return `Promise`; the run loop is driven by `setInterval` with `.unref()` so the process does not stay alive indefinitely
 
 </details>

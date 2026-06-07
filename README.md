@@ -66,6 +66,18 @@ threading.Thread(target=relay.start_and_run, daemon=True).start()
 
 </details>
 
+<details>
+<summary>TypeScript</summary>
+
+```typescript
+import { NeonRelay } from 'qti-neon';
+
+const relay = new NeonRelay('0.0.0.0'); // relay port 7777
+await relay.start();
+```
+
+</details>
+
 ### 2. Start a host
 
 <details>
@@ -93,6 +105,20 @@ host = NeonHost(session_id=42, relay_address="relay.example.com:7777")
 host.set_client_connect_callback(lambda cid, name, sid: on_client_join(cid, name))
 host.set_unhandled_packet_callback(lambda ptype, sender: handle_game_packet(ptype, sender))
 threading.Thread(target=host.start_and_run, daemon=True).start()
+```
+
+</details>
+
+<details>
+<summary>TypeScript</summary>
+
+```typescript
+import { NeonHost } from 'qti-neon';
+
+const host = new NeonHost(42, 'relay.example.com:7777');
+host.setClientConnectCallback((id, name, sid) => onClientJoin(id, name));
+host.setUnhandledPacketCallback((type, from) => handleGamePacket(type, from));
+await host.start();
 ```
 
 </details>
@@ -133,6 +159,21 @@ if client.connect(session_id=42, relay_address="relay.example.com:7777"):
 
 </details>
 
+<details>
+<summary>TypeScript</summary>
+
+```typescript
+import { NeonClient } from 'qti-neon';
+
+const client = new NeonClient('player1');
+client.setSessionConfigCallback(sc => onSessionConfig(sc));
+client.setUnhandledPacketCallback((type, from) => handleGamePacket(type, from));
+
+await client.connect(42, 'relay.example.com:7777');
+```
+
+</details>
+
 ### 4. Send a packet
 
 <details>
@@ -151,6 +192,16 @@ client.sendPacket(data, PACKET_POSITION, (byte) 0); // 0 = broadcast
 ```python
 data = encode_position(x, y, z)
 client.send_packet(data, PACKET_POSITION, dest_id=0)  # 0 = broadcast
+```
+
+</details>
+
+<details>
+<summary>TypeScript</summary>
+
+```typescript
+const data = encodePosition(x, y, z);
+client.sendPacket(data, PACKET_POSITION, 0); // 0 = broadcast
 ```
 
 </details>
@@ -175,6 +226,17 @@ boolean ok = client.reconnect(); // uses stored session token
 client.stop()  # or socket dies ungracefully
 # ...
 ok = client.reconnect()  # uses stored session token
+```
+
+</details>
+
+<details>
+<summary>TypeScript</summary>
+
+```typescript
+client.stop(); // or socket dies ungracefully
+// ...
+const ok = await client.reconnect(); // uses stored session token
 ```
 
 </details>
@@ -224,6 +286,23 @@ client = NeonClient("player1", client_cfg)
 
 </details>
 
+<details>
+<summary>TypeScript</summary>
+
+```typescript
+import { DtlsConfig, NeonConfig, NeonRelay, NeonClient } from 'qti-neon';
+
+// Relay — load certificate and private key
+const relayCfg = new NeonConfig({ dtlsConfig: DtlsConfig.fromKeyStore('relay.crt', 'relay.key') });
+const relay = new NeonRelay('0.0.0.0', relayCfg);
+
+// Host / Client — trust the relay certificate (or supply a proper trust store)
+const clientCfg = new NeonConfig({ dtlsConfig: DtlsConfig.insecureTrustAll() }); // dev only
+const client = new NeonClient('player1', clientCfg);
+```
+
+</details>
+
 `insecureTrustAll()` is for development and testing only — it accepts any certificate.
 For production, supply a trust manager that pins the relay's certificate.
 
@@ -255,6 +334,21 @@ With DTLS support:
 
 ```bash
 pip install "qti-neon[dtls]"
+```
+
+</details>
+
+<details>
+<summary>TypeScript (npm)</summary>
+
+```bash
+npm install qti-neon
+```
+
+With DTLS support:
+
+```bash
+npm install koffi
 ```
 
 </details>
@@ -297,6 +391,24 @@ Generate docs:
 ```bash
 pdoc src/qti_neon --output-dir ../docs/python
 # output: ../docs/python/qti_neon.html
+```
+
+</details>
+
+<details>
+<summary>TypeScript</summary>
+
+```bash
+cd js-ts
+npm install
+npm test
+```
+
+Generate docs:
+
+```bash
+npm run docs
+# output: ../docs/ts/index.html
 ```
 
 </details>
