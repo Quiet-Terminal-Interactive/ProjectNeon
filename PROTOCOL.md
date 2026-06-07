@@ -34,6 +34,108 @@ Offset  Size  Field
 | `0x0F`  | `RECONNECT_REQUEST`    | Client       | Rejoin with session token                       |
 | `0x10+` | `GAME_PACKET`          | Any          | Application-defined; type byte ≥ 0x10           |
 
+## Payload Formats
+
+All payloads follow the 8-byte header. All multi-byte fields are little-endian. Offsets are relative to the first payload byte (byte 8 of the full packet). `N`, `M`, `K` denote variable lengths determined by the preceding length field.
+
+### CONNECT_REQUEST (0x01)
+
+| Offset | Size | Field           | Type   | Notes       |
+| ------ | ---- | --------------- | ------ | ----------- |
+| 0      | 1    | `clientVersion` | uint8  |             |
+| 1      | 2    | `nameLen`       | uint16 | 1–64        |
+| 3      | N    | `name`          | UTF-8  | N = nameLen |
+| 3+N    | 4    | `sessionId`     | int32  |             |
+| 7+N    | 4    | `gameId`        | int32  |             |
+
+### CONNECT_ACCEPT (0x02)
+
+| Offset | Size | Field       | Type  | Notes                       |
+| ------ | ---- | ----------- | ----- | --------------------------- |
+| 0      | 1    | `clientId`  | uint8 | assigned by host/relay      |
+| 1      | 4    | `sessionId` | int32 |                             |
+| 5      | 8    | `token`     | int64 | session token for reconnect |
+
+### CONNECT_DENY (0x03)
+
+| Offset | Size | Field       | Type   | Notes         |
+| ------ | ---- | ----------- | ------ | ------------- |
+| 0      | 2    | `reasonLen` | uint16 | 1–256         |
+| 2      | N    | `reason`    | UTF-8  | N = reasonLen |
+
+### SESSION_CONFIG (0x04)
+
+Reliably delivered; clients ACK this packet.
+
+| Offset | Size | Field           | Type  | Notes |
+| ------ | ---- | --------------- | ----- | ----- |
+| 0      | 1    | `version`       | uint8 |       |
+| 1      | 2    | `tickRate`      | int16 |       |
+| 3      | 2    | `maxPacketSize` | int16 |       |
+
+### PACKET_TYPE_REGISTRY (0x05)
+
+| Offset | Size | Field        | Type   | Notes                        |
+| ------ | ---- | ------------ | ------ | ---------------------------- |
+| 0      | 2    | `entryCount` | uint16 | 0–100                        |
+| 2      | …    | entries      | —      | entryCount × PacketTypeEntry |
+
+Each **PacketTypeEntry**:
+
+| Offset | Size | Field         | Type  | Notes       |
+| ------ | ---- | ------------- | ----- | ----------- |
+| 0      | 1    | `packetId`    | uint8 |             |
+| 1      | 1    | `nameLen`     | uint8 | 0–64        |
+| 2      | M    | `name`        | UTF-8 | M = nameLen |
+| 2+M    | 1    | `descLen`     | uint8 | 0–255       |
+| 3+M    | K    | `description` | UTF-8 | K = descLen |
+
+### HOST_REGISTER (0x06)
+
+| Offset | Size | Field       | Type  | Notes |
+| ------ | ---- | ----------- | ----- | ----- |
+| 0      | 4    | `sessionId` | int32 |       |
+| 4      | 8    | `hostToken` | int64 |       |
+
+### PING (0x0B)
+
+| Offset | Size | Field       | Type  | Notes                |
+| ------ | ---- | ----------- | ----- | -------------------- |
+| 0      | 8    | `timestamp` | int64 | sender wall-clock ms |
+
+### PONG (0x0C)
+
+| Offset | Size | Field               | Type  | Notes            |
+| ------ | ---- | ------------------- | ----- | ---------------- |
+| 0      | 8    | `originalTimestamp` | int64 | echoed from PING |
+
+### DISCONNECT_NOTICE (0x0D)
+
+Empty payload (0 bytes).
+
+### ACK (0x0E)
+
+| Offset | Size | Field       | Type    | Notes     |
+| ------ | ---- | ----------- | ------- | --------- |
+| 0      | 2    | `count`     | uint16  | 0–100     |
+| 2      | 2×K  | `sequences` | int16[] | K = count |
+
+### RECONNECT_REQUEST (0x0F)
+
+| Offset | Size | Field              | Type  | Notes                        |
+| ------ | ---- | ------------------ | ----- | ---------------------------- |
+| 0      | 8    | `token`            | int64 | from original CONNECT_ACCEPT |
+| 8      | 4    | `sessionId`        | int32 |                              |
+| 12     | 1    | `previousClientId` | uint8 |                              |
+
+### GAME_PACKET (0x10–0xFF)
+
+| Offset | Size | Field     | Type      | Notes               |
+| ------ | ---- | --------- | --------- | ------------------- |
+| 0      | N    | `payload` | raw bytes | application-defined |
+
+Any packet type byte ≥ `0x10` is a game packet. The payload is opaque to the relay; its structure is defined by the application and advertised via `PACKET_TYPE_REGISTRY`.
+
 ## Connection Flow
 
 ```
