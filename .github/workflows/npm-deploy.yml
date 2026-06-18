@@ -1,4 +1,4 @@
- name: Deploy to npm
+name: Deploy to npm
 
 on:
   issues:

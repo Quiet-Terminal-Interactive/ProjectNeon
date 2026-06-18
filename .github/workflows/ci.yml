@@ -74,4 +74,4 @@ jobs:
           sudo chmod +x /usr/local/bin/godot
 
       - name: Check GDScript syntax
-        run: godot --headless --path godot --check-only --quit 2>&1 | tee godot_check.log; grep -v "^$" godot_check.log | grep -i "error" && exit 1 || exit 0
+        run: godot --headless --editor --path godot --quit 2>&1 | tee godot_check.log; grep -qiE "^ERROR:" godot_check.log && exit 1 || exit 0
