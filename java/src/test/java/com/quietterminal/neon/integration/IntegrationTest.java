@@ -100,7 +100,7 @@ class IntegrationTest {
         NeonClient client = connect("carol");
 
         List<Byte> received = new ArrayList<>();
-        host.setUnhandledPacketCallback((type, id) -> received.add(id));
+        host.setUnhandledPacketCallback((type, id, payload) -> received.add(id));
 
         client.sendPacket(new byte[] { 0x01, 0x02 }, (byte) 0x10, (byte) 1);
 

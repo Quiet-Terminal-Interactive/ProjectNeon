@@ -156,7 +156,7 @@ class TestIntegrationGamePackets:
         _, host, client, _ = stack
 
         received: list = []
-        host.set_unhandled_packet_callback(lambda pt, sid: received.append((pt, sid)))
+        host.set_unhandled_packet_callback(lambda pt, sid, payload: received.append((pt, sid)))
 
         client.send_packet(b"\xDE\xAD", packet_type=0x10, dest_id=1)
         time.sleep(0.2)
@@ -171,7 +171,7 @@ class TestIntegrationGamePackets:
 
         received_by_c2: list = []
         client2 = NeonClient("player2", cfg)
-        client2.set_unhandled_packet_callback(lambda pt, sid: received_by_c2.append((pt, sid)))
+        client2.set_unhandled_packet_callback(lambda pt, sid, payload: received_by_c2.append((pt, sid)))
         ok = client2.connect(session_id=1, relay_address=f"127.0.0.1:{cfg.relay_port}")
         assert ok
         threading.Thread(target=client2.run, daemon=True).start()

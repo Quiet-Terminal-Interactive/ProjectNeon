@@ -306,7 +306,7 @@ class TestClientUnhandledCallback:
             client_ping_interval_ms=30000,
         )
         client = NeonClient("p", cfg)
-        client.set_unhandled_packet_callback(lambda pt, sid: received.append((pt, sid)))
+        client.set_unhandled_packet_callback(lambda pt, sid, payload: received.append((pt, sid)))
 
         client_addr_holder: list = []
 

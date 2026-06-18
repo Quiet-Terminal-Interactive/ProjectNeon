@@ -103,7 +103,7 @@ class NeonClientTest {
         connectClient("carol");
 
         List<Byte> unhandled = new ArrayList<>();
-        client.setUnhandledPacketCallback((type, id) -> unhandled.add(id));
+        client.setUnhandledPacketCallback((type, id, payload) -> unhandled.add(id));
 
         mockRelay.sendPacket(NeonPacket.create(PacketType.GAME_PACKET, (short) 1, (byte) 1, (byte) 3,
                 new PacketPayload.GamePacket(new byte[] { 9 })), clientAddr);

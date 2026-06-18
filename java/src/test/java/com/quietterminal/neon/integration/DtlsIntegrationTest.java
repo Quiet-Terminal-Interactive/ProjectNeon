@@ -142,7 +142,7 @@ class DtlsIntegrationTest {
         CountDownLatch latch = new CountDownLatch(1);
         AtomicBoolean hostGotPacket = new AtomicBoolean(false);
 
-        host.setUnhandledPacketCallback((type, sender) -> {
+        host.setUnhandledPacketCallback((type, sender, payload) -> {
             hostGotPacket.set(true);
             latch.countDown();
         });
