@@ -18,8 +18,14 @@ var _relay_host: String = ""
 ## Returns a Godot [Error] code.
 func open(relay_host: String, relay_port: int, dtls_cfg: DtlsConfig) -> Error:
 	_relay_host = relay_host
+	var resolved_host := IP.resolve_hostname(relay_host, IP.TYPE_IPV4)
+	if resolved_host.is_empty():
+		resolved_host = IP.resolve_hostname(relay_host, IP.TYPE_IPV6)
+		if resolved_host.is_empty():
+			push_error("_socket: could not resolve hostname '%s'" % relay_host)
+			return ERR_CANT_RESOLVE
 	_udp = PacketPeerUDP.new()
-	_udp.set_dest_address(relay_host, relay_port)
+	_udp.set_dest_address(resolved_host, relay_port)
 	var err := _udp.bind(0)
 	if err != OK:
 		return err
@@ -27,12 +33,12 @@ func open(relay_host: String, relay_port: int, dtls_cfg: DtlsConfig) -> Error:
 	if dtls_cfg != null:
 		_dtls = PacketPeerDTLS.new()
 		var tls_opts := dtls_cfg.build_tls_options(relay_host)
-		err = _dtls.connect_to_peer(_udp, relay_host, tls_opts)
+		err = _dtls.connect_to_peer(_udp, resolved_host, tls_opts)
 		if err != OK:
 			_udp.close()
 			return err
 	else:
-		err = _udp.connect_to_host(relay_host, relay_port)
+		err = _udp.connect_to_host(resolved_host, relay_port)
 		if err != OK:
 			_udp.close()
 			return err
