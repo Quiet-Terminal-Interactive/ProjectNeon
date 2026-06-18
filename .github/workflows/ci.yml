@@ -59,3 +59,19 @@ jobs:
       - name: Test
         working-directory: js-ts
         run: npm test
+
+  test-godot:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Godot 4.2.2 headless
+        run: |
+          wget -q https://github.com/godotengine/godot/releases/download/4.2.2-stable/Godot_v4.2.2-stable_linux.x86_64.zip
+          unzip -q Godot_v4.2.2-stable_linux.x86_64.zip
+          sudo mv Godot_v4.2.2-stable_linux.x86_64 /usr/local/bin/godot
+          sudo chmod +x /usr/local/bin/godot
+
+      - name: Check GDScript syntax
+        run: godot --headless --path godot --check-only --quit 2>&1 | tee godot_check.log; grep -v "^$" godot_check.log | grep -i "error" && exit 1 || exit 0

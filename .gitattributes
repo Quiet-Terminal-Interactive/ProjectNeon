@@ -1,0 +1,8 @@
+# Normalize line endings
+* text=auto eol=lf
+
+# When the Godot Asset Library downloads a ZIP from a commit,
+# only include the addon folder — not the rest of the repo.
+/**                      export-ignore
+/godot/addons            !export-ignore
+/godot/addons/**         !export-ignore
