@@ -59,7 +59,7 @@ public final class NeonHost extends AbstractLifecycle implements AutoCloseable {
     private BiConsumer<String, String> clientDenyCallback;
     private Consumer<Byte> clientDisconnectCallback;
     private Consumer<Byte> pingReceivedCallback;
-    private BiConsumer<Byte, Byte> unhandledPacketCallback;
+    private TriConsumer<Byte, Byte, byte[]> unhandledPacketCallback;
     private GamePacketRegistry gamePacketRegistry;
 
     /**
@@ -115,9 +115,9 @@ public final class NeonHost extends AbstractLifecycle implements AutoCloseable {
 
     /**
      * Callback fired for game-specific packets not handled by the protocol layer.
-     * Arguments are {@code (packetType, senderId)}.
+     * Arguments are {@code (packetType, senderId, payload)}.
      */
-    public void setUnhandledPacketCallback(BiConsumer<Byte, Byte> cb) {
+    public void setUnhandledPacketCallback(TriConsumer<Byte, Byte, byte[]> cb) {
         this.unhandledPacketCallback = cb;
     }
 
@@ -237,8 +237,8 @@ public final class NeonHost extends AbstractLifecycle implements AutoCloseable {
             case PacketPayload.ReconnectRequest req -> handleReconnectRequest(req, header);
             case PacketPayload.Ping ping -> handlePing(ping, header);
             case PacketPayload.Ack ack -> handleAck(ack);
-            case PacketPayload.DisconnectNotice ignored -> handleDisconnect(header);
-            default -> dispatchToGame(header);
+            case @SuppressWarnings("unused") PacketPayload.DisconnectNotice ignored -> handleDisconnect(header);
+            default -> dispatchToGame(packet);
         }
     }
 
@@ -346,9 +346,10 @@ public final class NeonHost extends AbstractLifecycle implements AutoCloseable {
         logger.info("Client " + (id & 0xFF) + " (" + name + ") disconnected from session " + sessionId);
     }
 
-    private void dispatchToGame(PacketHeader header) {
+    private void dispatchToGame(NeonPacket packet) {
         if (unhandledPacketCallback != null) {
-            unhandledPacketCallback.accept(header.packetType(), header.clientId());
+            byte[] payload = packet.payload() instanceof PacketPayload.GamePacket gp ? gp.payload() : new byte[0];
+            unhandledPacketCallback.accept(packet.header().packetType(), packet.header().clientId(), payload);
         }
     }
 

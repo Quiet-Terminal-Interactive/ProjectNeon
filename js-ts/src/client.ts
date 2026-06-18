@@ -23,6 +23,8 @@ import {
   PacketTypeRegistryPayload,
   ConnectAcceptPayload,
   ConnectDenyPayload,
+  GamePacketPayload,
+  isGamePacket,
 } from "./_protocol";
 
 enum State {
@@ -52,7 +54,7 @@ export class NeonClient extends EventEmitter {
   private onPong: ((pong: PongPayload) => void) | null = null;
   private onSessionConfig: ((sc: SessionConfigPayload) => void) | null = null;
   private onPacketTypeRegistry: ((reg: PacketTypeRegistryPayload) => void) | null = null;
-  private onUnhandledPacket: ((packetType: number, senderClientId: number) => void) | null = null;
+  private onUnhandledPacket: ((packetType: number, senderClientId: number, payload: Buffer) => void) | null = null;
   private onDisconnect: ((clientId: number) => void) | null = null;
 
   constructor(name: string, config?: NeonConfig) {
@@ -74,7 +76,7 @@ export class NeonClient extends EventEmitter {
     this.onPacketTypeRegistry = cb;
   }
 
-  setUnhandledPacketCallback(cb: ((packetType: number, senderClientId: number) => void) | null): void {
+  setUnhandledPacketCallback(cb: ((packetType: number, senderClientId: number, payload: Buffer) => void) | null): void {
     this.onUnhandledPacket = cb;
   }
 
@@ -252,7 +254,8 @@ export class NeonClient extends EventEmitter {
     } else if (isDisconnectNotice(payload)) {
       this.onDisconnect?.(header.clientId);
     } else {
-      this.onUnhandledPacket?.(header.packetType, header.clientId);
+      const raw = isGamePacket(payload) ? (payload as GamePacketPayload).payload : Buffer.alloc(0);
+      this.onUnhandledPacket?.(header.packetType, header.clientId, raw);
     }
   }
 

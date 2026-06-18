@@ -21,6 +21,8 @@ import {
   AckPayload,
   PongPayload,
   DisconnectNoticePayload,
+  GamePacketPayload,
+  isGamePacket,
 } from "./_protocol";
 
 interface DisconnectedClient {
@@ -60,7 +62,7 @@ export class NeonHost extends EventEmitter {
   private onClientDeny: ((name: string, reason: string) => void) | null = null;
   private onClientDisconnect: ((clientId: number) => void) | null = null;
   private onPingReceived: ((clientId: number) => void) | null = null;
-  private onUnhandledPacket: ((packetType: number, senderClientId: number) => void) | null = null;
+  private onUnhandledPacket: ((packetType: number, senderClientId: number, payload: Buffer) => void) | null = null;
   private gamePacketRegistry: GamePacketRegistry | null = null;
 
   constructor(sessionId: number, relayAddress: string, config?: NeonConfig) {
@@ -88,7 +90,7 @@ export class NeonHost extends EventEmitter {
     this.onPingReceived = cb;
   }
 
-  setUnhandledPacketCallback(cb: ((packetType: number, senderClientId: number) => void) | null): void {
+  setUnhandledPacketCallback(cb: ((packetType: number, senderClientId: number, payload: Buffer) => void) | null): void {
     this.onUnhandledPacket = cb;
   }
 
@@ -202,7 +204,8 @@ export class NeonHost extends EventEmitter {
     } else if (isDisconnectNotice(payload)) {
       this._handleDisconnect(header.clientId);
     } else {
-      this.onUnhandledPacket?.(header.packetType, header.clientId);
+      const raw = isGamePacket(payload) ? (payload as GamePacketPayload).payload : Buffer.alloc(0);
+      this.onUnhandledPacket?.(header.packetType, header.clientId, raw);
     }
   }
 

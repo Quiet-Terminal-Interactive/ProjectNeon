@@ -26,6 +26,7 @@ from ._protocol import (
     Ack,
     Ping,
     Pong,
+    GamePacket,
 )
 from ._registry import GamePacketRegistry
 from ._socket import _NeonSocket
@@ -115,7 +116,7 @@ class NeonHost:
         self._client_deny_callback: Callable[[str, str], None] | None = None
         self._client_disconnect_callback: Callable[[int], None] | None = None
         self._ping_received_callback: Callable[[int], None] | None = None
-        self._unhandled_packet_callback: Callable[[int, int], None] | None = None
+        self._unhandled_packet_callback: Callable[[int, int, bytes], None] | None = None
         self._game_packet_registry: GamePacketRegistry | None = None
 
     # ------------------------------------------------------------------ #
@@ -163,12 +164,12 @@ class NeonHost:
         self._ping_received_callback = callback
 
     def set_unhandled_packet_callback(
-        self, callback: Callable[[int, int], None] | None
+        self, callback: Callable[[int, int, bytes], None] | None
     ) -> None:
         """Set a callback fired for game-specific packets.
 
         Args:
-            callback: Called with ``(packet_type_byte, sender_client_id)``.
+            callback: Called with ``(packet_type_byte, sender_client_id, payload)``.
         """
         self._unhandled_packet_callback = callback
 
@@ -361,7 +362,7 @@ class NeonHost:
             case DisconnectNotice():
                 self._handle_disconnect(header)
             case _:
-                self._dispatch_to_game(header)
+                self._dispatch_to_game(header, packet.payload)
 
     def _handle_connect_request(self, req: ConnectRequest, header: PacketHeader) -> None:
         with self._clients_lock:
@@ -512,9 +513,10 @@ class NeonHost:
             "Client %d (%s) disconnected from session %d", cid, name, self._session_id
         )
 
-    def _dispatch_to_game(self, header: PacketHeader) -> None:
+    def _dispatch_to_game(self, header: PacketHeader, payload: object) -> None:
         if self._unhandled_packet_callback:
-            self._unhandled_packet_callback(header.packet_type, header.client_id)
+            raw = payload.payload if isinstance(payload, GamePacket) else b""
+            self._unhandled_packet_callback(header.packet_type, header.client_id, raw)
 
     def _check_pending_acks(self) -> None:
         result = self._ack_machine.process()

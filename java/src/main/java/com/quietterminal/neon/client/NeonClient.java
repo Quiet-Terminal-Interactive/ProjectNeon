@@ -8,7 +8,6 @@ import java.net.SocketAddress;
 import java.net.SocketTimeoutException;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.logging.Logger;
 
@@ -52,7 +51,7 @@ public final class NeonClient extends AbstractLifecycle implements AutoCloseable
     private Consumer<PacketPayload.Pong> pongCallback;
     private Consumer<PacketPayload.SessionConfig> sessionConfigCallback;
     private Consumer<PacketPayload.PacketTypeRegistry> packetTypeRegistryCallback;
-    private BiConsumer<Byte, Byte> unhandledPacketCallback;
+    private TriConsumer<Byte, Byte, byte[]> unhandledPacketCallback;
     private Consumer<Byte> disconnectCallback;
 
     /**
@@ -197,13 +196,15 @@ public final class NeonClient extends AbstractLifecycle implements AutoCloseable
             }
             case PacketPayload.Ping ping ->
                 sendPong(ping.timestamp());
-            case PacketPayload.DisconnectNotice ignored -> {
+            case @SuppressWarnings("unused") PacketPayload.DisconnectNotice ignored -> {
                 if (disconnectCallback != null)
                     disconnectCallback.accept(header.clientId());
             }
-            default -> {
+            case PacketPayload.GamePacket gp -> {
                 if (unhandledPacketCallback != null)
-                    unhandledPacketCallback.accept(header.packetType(), header.clientId());
+                    unhandledPacketCallback.accept(header.packetType(), header.clientId(), gp.payload());
+            }
+            default -> {
             }
         }
     }
@@ -360,9 +361,9 @@ public final class NeonClient extends AbstractLifecycle implements AutoCloseable
 
     /**
      * Callback fired for packets whose type is not handled internally.
-     * Arguments are {@code (packetType, senderId)}.
+     * Arguments are {@code (packetType, senderId, payload)}.
      */
-    public void setUnhandledPacketCallback(BiConsumer<Byte, Byte> cb) {
+    public void setUnhandledPacketCallback(TriConsumer<Byte, Byte, byte[]> cb) {
         this.unhandledPacketCallback = cb;
     }
 

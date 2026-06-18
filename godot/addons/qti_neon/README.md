@@ -23,12 +23,12 @@ A `NeonRelay` server routes packets between a `NeonHost` and any number of `Neon
 # Host
 var host := NeonHost.new(session_id, "relay.example.com:7777")
 host.set_client_connect_callback(func(cid, name, sid): print("connected: ", name))
-host.set_unhandled_packet_callback(func(type, sender): print("packet from ", sender))
+host.set_unhandled_packet_callback(func(type, sender, payload): print("packet from ", sender))
 Thread.new().start(func(): host.start_and_run())
 
 # Client
 var client := NeonClient.new("PlayerName")
-client.set_unhandled_packet_callback(func(type, sender): print("packet from ", sender))
+client.set_unhandled_packet_callback(func(type, sender, payload): print("packet from ", sender))
 if client.join(session_id, "relay.example.com:7777"):
     Thread.new().start(func(): client.run())
     client.send_packet(PackedByteArray([0x01, 0x02]), 0x10, 1)

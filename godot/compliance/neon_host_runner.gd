@@ -27,7 +27,7 @@ func _initialize() -> void:
 	_host.set_client_connect_callback(func(cid: int, name: String, sid: int) -> void:
 		print("CLIENT_CONNECTED:%d:%s" % [cid, name])
 	)
-	_host.set_unhandled_packet_callback(func(type_byte: int, sender: int) -> void:
+	_host.set_unhandled_packet_callback(func(type_byte: int, sender: int, payload: PackedByteArray) -> void:
 		print("PACKET_RECEIVED:%d:%d" % [type_byte, sender])
 	)
 

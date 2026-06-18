@@ -137,7 +137,8 @@ public final class NeonRelay extends AbstractLifecycle implements AutoCloseable 
             case PacketPayload.ConnectRequest req -> handleConnectRequest(req, source, packet.header());
             case PacketPayload.ConnectAccept accept -> handleConnectAccept(accept, source, packet.header());
             case PacketPayload.ReconnectRequest req -> handleReconnectRequest(req, source);
-            case PacketPayload.DisconnectNotice ignored -> handleDisconnectNotice(source, packet.header());
+            case @SuppressWarnings("unused") PacketPayload.DisconnectNotice ignored ->
+                handleDisconnectNotice(source, packet.header());
             default -> routePacket(packet, source);
         }
     }
@@ -254,7 +255,7 @@ public final class NeonRelay extends AbstractLifecycle implements AutoCloseable 
             }
             case RelaySemantics.RoutingDecision.Unroutable u ->
                 logger.fine(() -> "Unroutable from " + source + ": " + u.reason());
-            case RelaySemantics.RoutingDecision.RelayHandled ignored -> {
+            case @SuppressWarnings("unused") RelaySemantics.RoutingDecision.RelayHandled ignored -> {
             }
         }
     }

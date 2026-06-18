@@ -98,7 +98,7 @@ thread.start(relay.start_and_run)
 NeonHost host = new NeonHost(42, "relay.example.com:7777", cfg);
 host.setClientConnectCallback((id, name, sid) ->
     System.out.println(name + " joined as " + (id & 0xFF)));
-host.setUnhandledPacketCallback((type, from) ->
+host.setUnhandledPacketCallback((type, from, payload) ->
     handleGamePacket(type, from));
 Thread.ofVirtual().start(() -> host.startAndRun());
 ```
@@ -114,7 +114,7 @@ from qti_neon import NeonHost
 
 host = NeonHost(session_id=42, relay_address="relay.example.com:7777")
 host.set_client_connect_callback(lambda cid, name, sid: on_client_join(cid, name))
-host.set_unhandled_packet_callback(lambda ptype, sender: handle_game_packet(ptype, sender))
+host.set_unhandled_packet_callback(lambda ptype, sender, payload: handle_game_packet(ptype, sender))
 threading.Thread(target=host.start_and_run, daemon=True).start()
 ```
 
@@ -128,7 +128,7 @@ import { NeonHost } from 'qti-neon';
 
 const host = new NeonHost(42, 'relay.example.com:7777');
 host.setClientConnectCallback((id, name, sid) => onClientJoin(id, name));
-host.setUnhandledPacketCallback((type, from) => handleGamePacket(type, from));
+host.setUnhandledPacketCallback((type, from, payload) => handleGamePacket(type, from));
 await host.start();
 ```
 
@@ -140,7 +140,7 @@ await host.start();
 ```gdscript
 var host := NeonHost.new(42, "relay.example.com:7777")
 host.set_client_connect_callback(func(id, name, sid): on_client_join(id, name))
-host.set_unhandled_packet_callback(func(type, from): handle_game_packet(type, from))
+host.set_unhandled_packet_callback(func(type, from, payload): handle_game_packet(type, from))
 var thread := Thread.new()
 thread.start(host.start_and_run)
 ```
@@ -156,7 +156,7 @@ thread.start(host.start_and_run)
 NeonClient client = new NeonClient("player1", cfg);
 client.setSessionConfigCallback(sc ->
     System.out.println("Tick rate: " + sc.tickRate()));
-client.setUnhandledPacketCallback((type, from) ->
+client.setUnhandledPacketCallback((type, from, payload) ->
     handleGamePacket(type, from));
 
 if (client.connect(42, "relay.example.com:7777")) {
@@ -175,7 +175,7 @@ from qti_neon import NeonClient
 
 client = NeonClient("player1")
 client.set_session_config_callback(lambda sc: on_session_config(sc))
-client.set_unhandled_packet_callback(lambda ptype, sender: handle_game_packet(ptype, sender))
+client.set_unhandled_packet_callback(lambda ptype, sender, payload: handle_game_packet(ptype, sender))
 
 if client.connect(session_id=42, relay_address="relay.example.com:7777"):
     threading.Thread(target=client.run, daemon=True).start()
@@ -191,7 +191,7 @@ import { NeonClient } from 'qti-neon';
 
 const client = new NeonClient('player1');
 client.setSessionConfigCallback(sc => onSessionConfig(sc));
-client.setUnhandledPacketCallback((type, from) => handleGamePacket(type, from));
+client.setUnhandledPacketCallback((type, from, payload) => handleGamePacket(type, from));
 
 await client.connect(42, 'relay.example.com:7777');
 ```
@@ -203,7 +203,7 @@ await client.connect(42, 'relay.example.com:7777');
 
 ```gdscript
 var client := NeonClient.new("player1")
-client.set_unhandled_packet_callback(func(type, from): handle_game_packet(type, from))
+client.set_unhandled_packet_callback(func(type, from, payload): handle_game_packet(type, from))
 
 if client.connect(42, "relay.example.com:7777"):
     var thread := Thread.new()

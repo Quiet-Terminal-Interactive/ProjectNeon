@@ -20,7 +20,7 @@ func _initialize() -> void:
 	var relay := args[1]
 
 	var client := NeonClient.new("godot-client")
-	client.set_unhandled_packet_callback(func(type_byte: int, sender: int) -> void:
+	client.set_unhandled_packet_callback(func(type_byte: int, sender: int, payload: PackedByteArray) -> void:
 		print("PACKET_RECEIVED:%d:%d" % [type_byte, sender])
 	)
 

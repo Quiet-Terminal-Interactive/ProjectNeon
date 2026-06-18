@@ -23,6 +23,7 @@ from ._protocol import (
     Ack,
     Ping,
     Pong,
+    GamePacket,
 )
 from ._socket import _NeonSocket
 
@@ -92,7 +93,7 @@ class NeonClient:
         self._pong_callback: Callable[[Pong], None] | None = None
         self._session_config_callback: Callable[[SessionConfig], None] | None = None
         self._packet_type_registry_callback: Callable[[PacketTypeRegistry], None] | None = None
-        self._unhandled_packet_callback: Callable[[int, int], None] | None = None
+        self._unhandled_packet_callback: Callable[[int, int, bytes], None] | None = None
         self._disconnect_callback: Callable[[int], None] | None = None
 
     # ------------------------------------------------------------------ #
@@ -130,12 +131,12 @@ class NeonClient:
         self._packet_type_registry_callback = callback
 
     def set_unhandled_packet_callback(
-        self, callback: Callable[[int, int], None] | None
+        self, callback: Callable[[int, int, bytes], None] | None
     ) -> None:
         """Set a callback fired for packets not handled by the protocol layer.
 
         Args:
-            callback: Called with ``(packet_type_byte, sender_client_id)``.
+            callback: Called with ``(packet_type_byte, sender_client_id, payload)``.
         """
         self._unhandled_packet_callback = callback
 
@@ -353,7 +354,8 @@ class NeonClient:
                     self._disconnect_callback(header.client_id)
             case _:
                 if self._unhandled_packet_callback:
-                    self._unhandled_packet_callback(header.packet_type, header.client_id)
+                    raw = packet.payload.payload if isinstance(packet.payload, GamePacket) else b""
+                    self._unhandled_packet_callback(header.packet_type, header.client_id, raw)
 
     def _handle_session_config(self, sc: SessionConfig, sequence: int) -> None:
         if self._session_config_callback:

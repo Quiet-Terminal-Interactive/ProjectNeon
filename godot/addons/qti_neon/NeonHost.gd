@@ -42,6 +42,7 @@ var client_disconnect_callback: Callable = Callable()
 ## Called for any received game packet not consumed by the host internally.
 ## [param type_byte] The packet type byte.
 ## [param sender] The client ID of the sender.
+## [param payload] The raw packet payload bytes.
 var unhandled_packet_callback: Callable = Callable()
 
 ## Optional packet type registry sent to clients when they connect.
@@ -67,7 +68,7 @@ func set_client_disconnect_callback(cb: Callable) -> void:
 	client_disconnect_callback = cb
 
 ## Sets the callback invoked for unhandled game packets.
-## [param cb] A [code]Callable[/code] taking [param type_byte] and [param sender] as integers.
+## [param cb] A [code]Callable[/code] taking [param type_byte], [param sender], and [param payload].
 func set_unhandled_packet_callback(cb: Callable) -> void:
 	unhandled_packet_callback = cb
 
@@ -223,7 +224,7 @@ func _handle_packet(data: PackedByteArray) -> void:
 		_:
 			if _Proto.is_game_packet(hdr["type"]) or hdr["type"] >= _Proto.PT_SESSION_CONFIG:
 				if unhandled_packet_callback.is_valid():
-					unhandled_packet_callback.call(hdr["type"], sender)
+					unhandled_packet_callback.call(hdr["type"], sender, payload)
 
 func _on_connect_request(payload: PackedByteArray) -> void:
 	var p := _Proto.parse_connect_request(payload)
