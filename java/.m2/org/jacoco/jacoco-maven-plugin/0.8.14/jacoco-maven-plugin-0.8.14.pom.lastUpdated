@@ -1,0 +1,4 @@
+#NOTE: This is a Maven Resolver internal implementation file, its format can be changed without prior notice.
+#Thu Jun 18 14:15:20 BST 2026
+@default-central-https\://repo.maven.apache.org/maven2/.lastUpdated=1781788520723
+https\://repo.maven.apache.org/maven2/.error=Could not transfer artifact org.jacoco\:jacoco-maven-plugin\:pom\:0.8.14 from/to central (https\://repo.maven.apache.org/maven2)\: repo.maven.apache.org\: Temporary failure in name resolution

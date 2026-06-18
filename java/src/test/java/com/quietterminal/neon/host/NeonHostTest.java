@@ -6,6 +6,7 @@ import org.junit.jupiter.api.*;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -17,6 +18,7 @@ class NeonHostTest {
         private NeonHost host;
         private Thread hostThread;
         private InetSocketAddress hostAddr;
+        private AtomicReference<Throwable> hostError;
 
         @BeforeEach
         void setUp() throws Exception {
@@ -26,10 +28,12 @@ class NeonHostTest {
                 int relayPort = mockRelay.getLocalAddress().getPort();
 
                 host = new NeonHost(42, "127.0.0.1:" + relayPort, CFG);
+                hostError = new AtomicReference<>();
                 hostThread = Thread.ofVirtual().start(() -> {
                         try {
                                 host.startAndRun();
-                        } catch (Exception ignored) {
+                        } catch (Exception e) {
+                                hostError.set(e);
                         }
                 });
 
@@ -40,7 +44,11 @@ class NeonHostTest {
                 mockRelay.sendPacket(NeonPacket.create(PacketType.CONNECT_ACCEPT, (short) 0, (byte) 0, (byte) 1,
                                 new PacketPayload.ConnectAccept((byte) 1, 42, 99L)), hostAddr);
 
-                Thread.sleep(100);
+                long deadline = System.currentTimeMillis() + 3000;
+                while (!host.isRunning() && hostError.get() == null && System.currentTimeMillis() < deadline) {
+                        Thread.sleep(10);
+                }
+                assertNull(hostError.get(), "Host thread failed during setup: " + hostError.get());
                 assertTrue(host.isRunning(), "Host did not reach RUNNING state");
         }
 
