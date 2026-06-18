@@ -5,8 +5,8 @@
 ##
 ## Packet header layout (8 bytes):
 ## [codeblock]
-## [0]    Magic 0 (0x4E)
-## [1]    Magic 1 (0x45)
+## [0]    Magic 0 (0x45)
+## [1]    Magic 1 (0x4E)
 ## [2]    Protocol version (0x01)
 ## [3]    Packet type byte
 ## [4-5]  Sequence number (uint16 little-endian)
@@ -14,10 +14,10 @@
 ## [7]    Destination client ID (0 = broadcast, 1 = host)
 ## [/codeblock]
 
-## First magic byte ('N').
-const MAGIC_0 := 0x4E
-## Second magic byte ('E').
-const MAGIC_1 := 0x45
+## First magic byte ('E').
+const MAGIC_0 := 0x45
+## Second magic byte ('N').
+const MAGIC_1 := 0x4E
 ## Current protocol version.
 const PROTO_VERSION := 0x01
 ## Size of the fixed packet header in bytes.
