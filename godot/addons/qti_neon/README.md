@@ -29,7 +29,7 @@ Thread.new().start(func(): host.start_and_run())
 # Client
 var client := NeonClient.new("PlayerName")
 client.set_unhandled_packet_callback(func(type, sender): print("packet from ", sender))
-if client.connect(session_id, "relay.example.com:7777"):
+if client.join(session_id, "relay.example.com:7777"):
     Thread.new().start(func(): client.run())
     client.send_packet(PackedByteArray([0x01, 0x02]), 0x10, 1)
 ```

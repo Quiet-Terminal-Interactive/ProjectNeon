@@ -24,7 +24,7 @@ func _initialize() -> void:
 		print("PACKET_RECEIVED:%d:%d" % [type_byte, sender])
 	)
 
-	var ok := client.connect(session_id, relay)
+	var ok := client.join(session_id, relay)
 	if not ok:
 		print("CONNECT_FAILED")
 		quit(1)

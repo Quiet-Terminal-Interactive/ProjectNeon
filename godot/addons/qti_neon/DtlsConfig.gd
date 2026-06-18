@@ -62,7 +62,7 @@ func build_tls_options(relay_hostname: String = "") -> TLSOptions:
 			return TLSOptions.server(key, cert)
 		Mode.CLIENT_TRUSTED:
 			var ca := load(_ca_path) as X509Certificate
-			return TLSOptions.client(relay_hostname, ca)
+			return TLSOptions.client(ca, relay_hostname)
 		Mode.CLIENT_INSECURE:
-			return TLSOptions.client_unsafe(relay_hostname)
-	return TLSOptions.client_unsafe(relay_hostname)
+			return TLSOptions.client_unsafe()
+	return TLSOptions.client_unsafe()

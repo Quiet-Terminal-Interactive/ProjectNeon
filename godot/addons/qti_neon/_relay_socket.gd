@@ -70,11 +70,12 @@ func _receive_plain(buffer_size: int, enforce: bool) -> Array:
 
 
 func _receive_dtls(buffer_size: int, enforce: bool) -> Array:
-	_dtls_server.poll()
+	_udp_server.poll()
 
-	while _dtls_server.get_connection_count() > 0:
-		var peer: PacketPeerDTLS = _dtls_server.take_connection()
-		_dtls_handshaking.append(peer)
+	while _udp_server.is_connection_available():
+		var udp_peer: PacketPeerUDP = _udp_server.take_connection()
+		var dtls_peer: PacketPeerDTLS = _dtls_server.take_connection(udp_peer)
+		_dtls_handshaking.append(dtls_peer)
 
 	var graduated: Array = []
 	var failed: Array = []

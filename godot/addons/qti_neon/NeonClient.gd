@@ -73,7 +73,7 @@ func set_disconnect_callback(cb: Callable) -> void:
 ## [param session_id] The session ID to join.
 ## [param relay_address] The relay address in [code]host:port[/code] format.
 ## Returns [code]true[/code] on success.
-func connect(session_id: int, relay_address: String) -> bool:
+func join(session_id: int, relay_address: String) -> bool:
 	var colon := relay_address.rfind(":")
 	if colon == -1:
 		push_error("NeonClient: invalid relay address '%s'" % relay_address)
