@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BatchAckManager | qti-neon</title>
+<style>
+:root {
+    --bg: #f2f4f8;
+    --bg2: #fff;
+    --border: #e0e0e0;
+    --text: #222;
+    --text-aside: #6e6e6e;
+    --link: #1f70c2;
+    --kw: #056bd6;
+    --type: #9f5f30;
+    --fn: #be3989;
+    --param: #4760ec;
+    --sig-bg: #f9f9fb;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--text);
+    background: var(--bg);
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+/* Top bar */
+header {
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    padding: 0 24px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+header .title {
+    font-weight: 700;
+    font-size: 15px;
+    color: var(--text);
+    text-decoration: none;
+}
+
+header .breadcrumb {
+    font-size: 13px;
+    color: var(--text-aside);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+header .breadcrumb a { color: var(--link); text-decoration: none; }
+header .breadcrumb a:hover { text-decoration: underline; }
+header .breadcrumb .sep { color: var(--text-aside); }
+
+/* Layout */
+.layout {
+    display: flex;
+    flex: 1;
+    max-width: 1200px;
+    margin: 0 auto;
+    width: 100%;
+    padding: 0 16px;
+    gap: 0;
+}
+
+/* Sidebar */
+nav#sidebar {
+    width: 220px;
+    min-width: 220px;
+    padding: 20px 0 40px;
+    position: sticky;
+    top: 44px;
+    height: calc(100vh - 44px);
+    overflow-y: auto;
+    flex-shrink: 0;
+}
+
+nav#sidebar .nav-section {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--text-aside);
+    padding: 16px 8px 4px;
+}
+
+nav#sidebar a {
+    display: block;
+    padding: 3px 8px;
+    color: var(--text);
+    text-decoration: none;
+    font-size: 13px;
+    border-radius: 3px;
+}
+
+nav#sidebar a:hover { background: var(--border); }
+nav#sidebar a.active { background: #dbe8f6; color: var(--link); font-weight: 600; }
+
+/* Main */
+main {
+    flex: 1;
+    min-width: 0;
+    padding: 24px 0 80px 32px;
+}
+
+/* Index page */
+.index-header {
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+}
+
+.index-header h1 { font-size: 22px; font-weight: 700; }
+.index-header p { color: var(--text-aside); margin-top: 4px; font-size: 13px; }
+
+.class-index-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+.class-index-table th {
+    text-align: left;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--text-aside);
+    padding: 4px 8px;
+    border-bottom: 1px solid var(--border);
+}
+
+.class-index-table td {
+    padding: 6px 8px;
+    border-bottom: 1px solid #f0f0f0;
+    vertical-align: top;
+}
+
+.class-index-table tr:last-child td { border-bottom: none; }
+.class-index-table .class-link { font-weight: 600; color: var(--link); text-decoration: none; }
+.class-index-table .class-link:hover { text-decoration: underline; }
+.class-index-table .extends-col { color: var(--text-aside); font-family: monospace; font-size: 12px; }
+.class-index-table .doc-col { color: var(--text-aside); }
+
+/* Class page */
+.page-title {
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+}
+
+.page-title h1 {
+    font-size: 22px;
+    font-weight: 700;
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.page-title .file-tag {
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--text-aside);
+    font-family: monospace;
+}
+
+.page-title .extends-line {
+    font-size: 13px;
+    color: var(--text-aside);
+    margin-top: 4px;
+    font-family: monospace;
+}
+
+.page-title .extends-line .ext-name { color: var(--link); }
+
+.page-doc { font-size: 14px; margin-top: 12px; }
+
+/* Index panel */
+.index-panel {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    margin-bottom: 24px;
+    overflow: hidden;
+}
+
+.index-panel summary {
+    padding: 10px 14px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 13px;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    user-select: none;
+}
+
+.index-panel summary::-webkit-details-marker { display: none; }
+.index-panel summary::before { content: "▸"; font-size: 10px; color: var(--text-aside); }
+details[open] .index-panel summary::before { content: "▾"; }
+details[open] .index-panel summary { border-bottom: 1px solid var(--border); }
+
+.index-panel .index-body {
+    padding: 10px 14px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 2px 16px;
+}
+
+.index-panel .index-section-label {
+    grid-column: 1 / -1;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--text-aside);
+    padding: 8px 0 2px;
+}
+
+.index-panel a {
+    font-size: 13px;
+    color: var(--link);
+    text-decoration: none;
+    padding: 1px 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.index-panel a:hover { text-decoration: underline; }
+
+/* Sections */
+.section {
+    margin-top: 32px;
+}
+
+.section > h2 {
+    font-size: 16px;
+    font-weight: 700;
+    margin-bottom: 12px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+}
+
+/* Member table (vars, consts, signals) */
+.member-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.member-table th {
+    text-align: left;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--text-aside);
+    padding: 6px 12px;
+    background: var(--sig-bg);
+    border-bottom: 1px solid var(--border);
+    font-weight: 600;
+}
+
+.member-table td {
+    padding: 8px 12px;
+    border-bottom: 1px solid #f0f0f0;
+    vertical-align: top;
+}
+
+.member-table tr:last-child td { border-bottom: none; }
+.member-table .name-col { font-family: monospace; font-weight: 600; }
+.member-table .name-col a { color: var(--text); text-decoration: none; }
+.member-table .type-col { font-family: monospace; color: var(--type); white-space: nowrap; }
+.member-table .default-col { font-family: monospace; color: var(--text-aside); font-size: 12px; }
+.member-table .doc-col { color: var(--text-aside); }
+
+/* Function entry */
+.fn-entry {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    margin-bottom: 12px;
+    overflow: hidden;
+}
+
+.fn-entry .fn-sig {
+    padding: 10px 14px;
+    background: var(--sig-bg);
+    border-bottom: 1px solid var(--border);
+    font-family: monospace;
+    font-size: 13px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0;
+}
+
+.fn-sig .kw   { color: var(--kw); font-weight: 700; margin-right: 5px; }
+.fn-sig .fn   { color: var(--fn); font-weight: 700; }
+.fn-sig .paren{ color: var(--text-aside); }
+.fn-sig .pn   { color: var(--param); }
+.fn-sig .pt   { color: var(--type); }
+.fn-sig .pd   { color: var(--text-aside); }
+.fn-sig .ret  { color: var(--type); }
+.fn-sig .sep  { color: var(--text-aside); margin: 0 2px; }
+
+.fn-entry .fn-body {
+    padding: 12px 14px;
+}
+
+.fn-body .fn-doc { font-size: 13px; color: var(--text); margin-bottom: 10px; }
+.fn-body .fn-doc p { margin-bottom: 4px; }
+
+.fn-body .param-list {
+    font-size: 12px;
+    border-top: 1px solid #f0f0f0;
+    padding-top: 8px;
+    margin-top: 4px;
+}
+
+.fn-body .param-list table {
+    border-collapse: collapse;
+    width: 100%;
+}
+
+.fn-body .param-list th {
+    text-align: left;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--text-aside);
+    padding: 2px 8px 2px 0;
+    font-weight: 600;
+}
+
+.fn-body .param-list td {
+    padding: 2px 8px 2px 0;
+    vertical-align: top;
+}
+
+.fn-body .param-list .p-name { font-family: monospace; font-weight: 700; color: var(--param); }
+.fn-body .param-list .p-type { font-family: monospace; color: var(--type); }
+.fn-body .param-list .p-default { font-family: monospace; color: var(--text-aside); }
+.fn-body .param-list .p-desc { color: var(--text-aside); }
+
+/* Enum */
+.enum-entry {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    margin-bottom: 12px;
+    overflow: hidden;
+}
+
+.enum-entry .enum-sig {
+    padding: 10px 14px;
+    background: var(--sig-bg);
+    border-bottom: 1px solid var(--border);
+    font-family: monospace;
+    font-size: 13px;
+}
+
+.enum-entry .enum-sig .kw { color: var(--kw); font-weight: 700; margin-right: 5px; }
+.enum-entry .enum-body { padding: 10px 14px; }
+.enum-entry .enum-doc { font-size: 13px; color: var(--text-aside); margin-bottom: 8px; }
+
+.enum-val-table { font-family: monospace; font-size: 12px; border-collapse: collapse; }
+.enum-val-table td { padding: 1px 12px 1px 0; }
+.enum-val-table .v-name { font-weight: 700; }
+.enum-val-table .v-val  { color: var(--text-aside); }
+
+/* Tags */
+.tag {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 1px 5px;
+    border-radius: 3px;
+    margin-left: 6px;
+    vertical-align: middle;
+}
+.tag-dep { background: #fee2e2; color: #991b1b; }
+.tag-exp { background: #fef3c7; color: #92400e; }
+
+/* Misc */
+code { font-family: monospace; background: #eef0f4; padding: 1px 4px; border-radius: 3px; font-size: .9em; }
+.sig-param { font-family: monospace; color: var(--param); }
+pre { background: #1e1e2e; color: #cdd6f4; padding: 12px 14px; border-radius: 4px; overflow-x: auto; font-size: 12px; }
+pre code { background: none; padding: 0; color: inherit; }
+p { margin-bottom: .5em; }
+p:last-child { margin-bottom: 0; }
+a { color: var(--link); }
+
+@media (max-width: 720px) {
+    .layout { padding: 0 8px; }
+    nav#sidebar { display: none; }
+    main { padding: 16px 0 40px; }
+}
+</style>
+</head>
+<body>
+<header>
+  <a class="title" href="index.html">qti-neon</a>
+  <span class="sep" style="color:#ccc">|</span>
+  <nav class="breadcrumb"><a href="index.html">qti-neon</a> <span class="sep">/</span> BatchAckManager</nav>
+</header>
+<div class="layout">
+  <nav id="sidebar">
+    <a href="index.html">Overview</a>
+    <div class="nav-section">Classes</div>
+<a href="BatchAckManager.html" class="active">BatchAckManager</a>
+<a href="DtlsConfig.html">DtlsConfig</a>
+<a href="GamePacketRegistry.html">GamePacketRegistry</a>
+<a href="NeonClient.html">NeonClient</a>
+<a href="NeonConfig.html">NeonConfig</a>
+<a href="NeonHost.html">NeonHost</a>
+<a href="NeonRelay.html">NeonRelay</a>
+<a href="ReliablePacketManager.html">ReliablePacketManager</a>
+<a href="neon_client_runner.html">neon_client_runner</a>
+<a href="neon_host_runner.html">neon_host_runner</a>
+<a href="plugin.html">plugin</a>
+  </nav>
+  <main>
+<div class="page-title">
+  <h1>BatchAckManager <span class="file-tag">BatchAckManager.gd</span></h1>
+  <div class="extends-line">extends <span class="ext-name">RefCounted</span></div>
+  <div class="page-doc"><p>Queues inbound sequence numbers and flushes them as a single ACK packet.</p>
+<p>Use this to acknowledge reliable packets received from the host without sending one ACK per packet. Call <a href="#fn-queue">queue</a> for each sequence number received, then call <a href="#fn-flush">flush</a> once per tick to send them all in one packet.</p></div>
+</div>
+
+<details open>
+  <div class="index-panel">
+    <summary>Index</summary>
+    <div class="index-body">
+      <div class="index-section-label">Constants</div><a href="#const-_Proto">_Proto</a><div class="index-section-label">Properties</div><a href="#var-_my_client_id">_my_client_id</a><a href="#var-_pending">_pending</a><a href="#var-ack_payload">ack_payload</a><a href="#var-pkt">pkt</a><div class="index-section-label">Methods</div><a href="#fn-_init">_init</a><a href="#fn-queue">queue</a><a href="#fn-flush">flush</a><a href="#fn-is_empty">is_empty</a>
+    </div>
+  </div>
+</details>
+<div class="section"><h2>Constants</h2><table class="member-table"><thead><tr><th>Name</th><th>Value</th><th>Description</th></tr></thead><tbody><tr id="const-_Proto"><td class="name-col">_Proto</td><td class="default-col">preload(&quot;res://addons/qti_neon/_protocol.gd&quot;)</td><td class="doc-col"></td></tr></tbody></table></div>
+<div class="section"><h2>Properties</h2><table class="member-table"><thead><tr><th>Type</th><th>Name</th><th>Default</th><th>Description</th></tr></thead><tbody><tr id="var-_my_client_id"><td class="type-col"><span class="type-col">int</span></td><td class="name-col">_my_client_id</td><td class="default-col"></td><td class="doc-col"></td></tr><tr id="var-_pending"><td class="type-col"><span class="type-col">Array</span></td><td class="name-col">_pending</td><td class="default-col">[]</td><td class="doc-col"></td></tr><tr id="var-ack_payload"><td class="type-col"><span style="color:#ccc">Variant</span></td><td class="name-col">ack_payload</td><td class="default-col">_Proto.build_ack(_pending)</td><td class="doc-col"></td></tr><tr id="var-pkt"><td class="type-col"><span style="color:#ccc">Variant</span></td><td class="name-col">pkt</td><td class="default-col">_Proto.build_packet(</td><td class="doc-col"></td></tr></tbody></table></div>
+<div class="section"><h2>Methods</h2>
+<div class="fn-entry" id="fn-_init"><div class="fn-sig"><span class="kw">func</span><span class="fn">_init</span><span class="paren">(</span><span class="pn">my_client_id</span><span class="sep">:</span><span class="pt">int</span><span class="paren">)</span></div><div class="fn-body"><div class="fn-doc"><p>Creates a manager for the given client. <code class="sig-param">my_client_id</code> The local client ID, included in outbound ACK packet headers.</p></div><div class="param-list"><table><thead><tr><th>Parameter</th><th>Type</th><th>Default</th><th>Description</th></tr></thead><tbody><tr><td class="p-name">my_client_id</td><td class="p-type">int</td><td class="p-default"></td><td class="p-desc">The local client ID, included in outbound ACK packet headers.</td></tr></tbody></table></div></div></div>
+<div class="fn-entry" id="fn-queue"><div class="fn-sig"><span class="kw">func</span><span class="fn">queue</span><span class="paren">(</span><span class="pn">sequence</span><span class="sep">:</span><span class="pt">int</span><span class="paren">)</span></div><div class="fn-body"><div class="fn-doc"><p>Queues a sequence number to be acknowledged on the next <a href="#fn-flush">flush</a>. <code class="sig-param">sequence</code> The sequence number from the received packet header.</p></div><div class="param-list"><table><thead><tr><th>Parameter</th><th>Type</th><th>Default</th><th>Description</th></tr></thead><tbody><tr><td class="p-name">sequence</td><td class="p-type">int</td><td class="p-default"></td><td class="p-desc">The sequence number from the received packet header.</td></tr></tbody></table></div></div></div>
+<div class="fn-entry" id="fn-flush"><div class="fn-sig"><span class="kw">func</span><span class="fn">flush</span><span class="paren">(</span><span class="pn">next_seq</span><span class="sep">:</span><span class="pt">int</span><span class="sep">, </span><span class="pn">dest_id</span><span class="sep">:</span><span class="pt">int</span><span class="sep">, </span><span class="pn">send_callable</span><span class="sep">:</span><span class="pt">Callable</span><span class="paren">)</span></div><div class="fn-body"><div class="fn-doc"><p>Sends all queued sequence numbers as a single ACK packet and clears the queue.</p>
+<p>Does nothing if the queue is empty. <code class="sig-param">next_seq</code> The sequence number to use for the outbound ACK packet. <code class="sig-param">dest_id</code> The destination client ID (typically <code>1</code> for the host). <code class="sig-param">send_callable</code> A <code>Callable</code> that accepts a [PackedByteArray] and sends it.</p></div><div class="param-list"><table><thead><tr><th>Parameter</th><th>Type</th><th>Default</th><th>Description</th></tr></thead><tbody><tr><td class="p-name">next_seq</td><td class="p-type">int</td><td class="p-default"></td><td class="p-desc">The sequence number to use for the outbound ACK packet.</td></tr><tr><td class="p-name">dest_id</td><td class="p-type">int</td><td class="p-default"></td><td class="p-desc">The destination client ID (typically</td></tr><tr><td class="p-name">send_callable</td><td class="p-type">Callable</td><td class="p-default"></td><td class="p-desc">A</td></tr></tbody></table></div></div></div>
+<div class="fn-entry" id="fn-is_empty"><div class="fn-sig"><span class="kw">func</span><span class="fn">is_empty</span><span class="paren">(</span><span class="paren">)</span><span class="sep"> -&gt; </span><span class="ret">bool</span></div><div class="fn-body"><div class="fn-doc"><p>Returns <code>true</code> if there are no queued sequence numbers.</p></div></div></div>
+</div></main>
+</div>
+</body>
+</html>

@@ -56,6 +56,16 @@ Any new packet type must be added to all implementations to maintain interoperab
 
 </details>
 
+<details>
+<summary>Godot</summary>
+
+1. Add a constant to `_protocol.gd` (e.g. `const PT_MY_PACKET := 0x07`)
+2. Add `parse_my_packet(p)` and `build_my_packet(...)` static functions to `_protocol.gd`
+3. Add a `match` branch to `_handle_raw()` in `NeonRelay.gd`, `_handle_packet()` in `NeonHost.gd`, or `_handle_packet()` in `NeonClient.gd` as appropriate
+4. Add tests
+
+</details>
+
 ## Adding a New Language Implementation
 
 New language implementations are always welcome. To be accepted, the implementation must be integrated into `test_compliance.py` and all compliance tests must pass.
@@ -74,6 +84,14 @@ Concretely, for a new implementation called `<lang>`:
 The Java implementation is the wire-format reference. If the new implementation disagrees with Java on packet framing or session handshake, fix the new implementation — not Java.
 
 ## Requirements
+
+<details>
+<summary>Godot</summary>
+
+- Godot 4.2+ (headless build required for the compliance test runner)
+- No additional dependencies — all DTLS uses Godot's built-in `DTLSServer` / `PacketPeerDTLS` / `TLSOptions`
+
+</details>
 
 <details>
 <summary>Java</summary>
@@ -106,6 +124,20 @@ Optional for DTLS:
 </details>
 
 ## Build
+
+<details>
+<summary>Godot</summary>
+
+No build step, the implementation is pure GDScript. Copy (or symlink) `godot/addons/qti_neon/` into your project's `addons/` directory and enable the plugin in **Project -> Project Settings -> Plugins**.
+
+To verify the compliance scripts parse correctly:
+
+```bash
+cd godot
+godot --headless --check-only --script compliance/neon_host_runner.gd
+```
+
+</details>
 
 <details>
 <summary>Java</summary>
@@ -160,6 +192,26 @@ npm install koffi
 </details>
 
 ## Tests
+
+<details>
+<summary>Godot</summary>
+
+The GDScript implementation is covered by the cross-language compliance test in `test_compliance.py` (tests E and F). There is no standalone unit test suite; protocol correctness is validated by interoperating with the Java reference implementation.
+
+To run the Godot compliance tests:
+
+```bash
+python3 test_compliance.py
+```
+
+Compliance scripts are in `godot/compliance/` and are run as:
+
+```bash
+godot --headless --path godot/ --script compliance/neon_host_runner.gd   -- <session_id> <relay>
+godot --headless --path godot/ --script compliance/neon_client_runner.gd -- <session_id> <relay>
+```
+
+</details>
 
 <details>
 <summary>Java</summary>
@@ -260,6 +312,19 @@ Tests are split by concern:
 </details>
 
 ## Code Style
+
+<details>
+<summary>Godot</summary>
+
+- Godot 4.2+ GDScript with static typing where practical
+- No `print()` in `addons/qti_neon/` (use `push_error()` / `push_warning()` for runtime diagnostics)
+- No comments that describe *what* the code does — only *why*, when non-obvious
+- No speculative abstractions — solve the problem in front of you
+- Prefix internal scripts with `_` (e.g. `_protocol.gd`, `_socket.gd`); `class_name` only for public API scripts
+- Use `Mutex` for all state shared between the processing thread and the application thread
+- All 64-bit wire fields (`token`, `host_token`, `timestamp`) use GDScript's native `int` (64-bit signed); no special handling needed
+
+</details>
 
 <details>
 <summary>Java</summary>

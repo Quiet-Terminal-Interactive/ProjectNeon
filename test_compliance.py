@@ -36,12 +36,15 @@ SESSION_A = 9901   # Java host / Python client
 SESSION_B = 9902   # Python host / Java client
 SESSION_C = 9903   # Java host / TypeScript client
 SESSION_D = 9904   # TypeScript host / Java client
+SESSION_E = 9905   # Java host / Godot client
+SESSION_F = 9906   # Godot host / Java client
 
 BASE_DIR    = os.path.dirname(os.path.abspath(__file__))
 JAVA_DIR    = os.path.join(BASE_DIR, "java")
 PYTHON_DIR  = os.path.join(BASE_DIR, "python")
 JS_TS_DIR   = os.path.join(BASE_DIR, "js-ts")
 JS_TS_DIST  = os.path.join(JS_TS_DIR, "dist")
+GODOT_DIR   = os.path.join(BASE_DIR, "godot")
 WORK_DIR    = os.path.join(BASE_DIR, ".compliance_work")
 VENV_DIR    = os.path.join(BASE_DIR, ".compliance_venv")
 VENV_PYTHON = os.path.join(VENV_DIR, "bin", "python")
@@ -334,6 +337,10 @@ def _java_cmd(main_class: str, *args) -> list:
     return ["java", "-cp", cp, main_class, *args]
 
 
+def _godot_cmd(script: str, *args) -> list:
+    return ["godot", "--headless", "--path", GODOT_DIR, "--script", script, "--", *args]
+
+
 # Tests
 
 def _test_java_host_python_client() -> None:
@@ -500,6 +507,88 @@ def _test_ts_host_java_client() -> None:
         raise RuntimeError("TypeScript host did not receive the game packet from Java client")
 
 
+def _test_java_host_godot_client() -> None:
+    _section(f"Test E: Java host  ←→  Godot client   (session {SESSION_E})")
+
+    print("  Starting Java host…")
+    host_proc, host_lines = _launch(
+        _java_cmd("NeonHostRunner", str(SESSION_E), RELAY),
+        ready_marker="HOST_READY",
+        timeout=20,
+    )
+
+    print("  Starting Godot client…")
+    client_proc, client_lines = _launch(
+        _godot_cmd("compliance/neon_client_runner.gd", str(SESSION_E), RELAY),
+        ready_marker="PACKET_SENT",
+        timeout=25,
+        use_stdin_pipe=False,
+    )
+
+    time.sleep(2.0)
+    client_proc.wait(timeout=5)
+
+    ok_conn   = any("CLIENT_CONNECTED" in l for l in host_lines)
+    ok_packet = any("PACKET_RECEIVED"  in l for l in host_lines)
+
+    try:
+        host_proc.stdin.close()
+        host_proc.wait(timeout=8)
+    except Exception:
+        host_proc.kill()
+
+    if ok_conn:
+        print(f"  {_PASS}  Java host registered Godot client connection")
+    else:
+        print(f"  {_FAIL}  Java host never saw CLIENT_CONNECTED")
+
+    if ok_packet:
+        print(f"  {_PASS}  Java host received game packet from Godot client")
+    else:
+        raise RuntimeError("Java host did not receive the game packet from Godot client")
+
+
+def _test_godot_host_java_client() -> None:
+    _section(f"Test F: Godot host  ←→  Java client   (session {SESSION_F})")
+
+    print("  Starting Godot host…")
+    host_proc, host_lines = _launch(
+        _godot_cmd("compliance/neon_host_runner.gd", str(SESSION_F), RELAY),
+        ready_marker="HOST_READY",
+        timeout=25,
+    )
+
+    print("  Starting Java client…")
+    client_proc, client_lines = _launch(
+        _java_cmd("NeonClientRunner", str(SESSION_F), RELAY),
+        ready_marker="PACKET_SENT",
+        timeout=20,
+        use_stdin_pipe=False,
+    )
+
+    time.sleep(2.0)
+    client_proc.wait(timeout=5)
+
+    ok_conn   = any("CLIENT_CONNECTED" in l for l in host_lines)
+    ok_packet = any("PACKET_RECEIVED"  in l for l in host_lines)
+
+    try:
+        host_proc.stdin.close()
+        host_proc.wait(timeout=8)
+    except Exception:
+        host_proc.kill()
+
+    if ok_conn:
+        print(f"  {_PASS}  Godot host registered Java client connection")
+    else:
+        print(f"  {_FAIL}  Godot host never saw CLIENT_CONNECTED")
+
+    if ok_packet:
+        print(f"  {_PASS}  Godot host received game packet from Java client")
+    else:
+        raise RuntimeError("Godot host did not receive the game packet from Java client")
+
+
 # Main
 
 def main() -> int:
@@ -558,6 +647,18 @@ def main() -> int:
     except Exception as e:
         print(f"\n  {_FAIL}  Test D failed: {e}")
         failures.append(f"Test D: {e}")
+
+    try:
+        _test_java_host_godot_client()
+    except Exception as e:
+        print(f"\n  {_FAIL}  Test E failed: {e}")
+        failures.append(f"Test E: {e}")
+
+    try:
+        _test_godot_host_java_client()
+    except Exception as e:
+        print(f"\n  {_FAIL}  Test F failed: {e}")
+        failures.append(f"Test F: {e}")
 
     _section("Step 5: Cleanup")
 

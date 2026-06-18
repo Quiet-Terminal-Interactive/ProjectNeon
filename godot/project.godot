@@ -1,0 +1,20 @@
+; Engine configuration file.
+; Generated for QTI Neon GDScript implementation.
+
+config_version=5
+
+[application]
+
+config/name="QTI Neon"
+config/version="1.0.0"
+config/features=PackedStringArray("4.2")
+config/run/main_scene=""
+
+[display]
+
+window/size/viewport_width=1
+window/size/viewport_height=1
+
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/qti_neon")

@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NeonHost | qti-neon</title>
+<style>
+:root {
+    --bg: #f2f4f8;
+    --bg2: #fff;
+    --border: #e0e0e0;
+    --text: #222;
+    --text-aside: #6e6e6e;
+    --link: #1f70c2;
+    --kw: #056bd6;
+    --type: #9f5f30;
+    --fn: #be3989;
+    --param: #4760ec;
+    --sig-bg: #f9f9fb;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--text);
+    background: var(--bg);
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+/* Top bar */
+header {
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    padding: 0 24px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+header .title {
+    font-weight: 700;
+    font-size: 15px;
+    color: var(--text);
+    text-decoration: none;
+}
+
+header .breadcrumb {
+    font-size: 13px;
+    color: var(--text-aside);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+header .breadcrumb a { color: var(--link); text-decoration: none; }
+header .breadcrumb a:hover { text-decoration: underline; }
+header .breadcrumb .sep { color: var(--text-aside); }
+
+/* Layout */
+.layout {
+    display: flex;
+    flex: 1;
+    max-width: 1200px;
+    margin: 0 auto;
+    width: 100%;
+    padding: 0 16px;
+    gap: 0;
+}
+
+/* Sidebar */
+nav#sidebar {
+    width: 220px;
+    min-width: 220px;
+    padding: 20px 0 40px;
+    position: sticky;
+    top: 44px;
+    height: calc(100vh - 44px);
+    overflow-y: auto;
+    flex-shrink: 0;
+}
+
+nav#sidebar .nav-section {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--text-aside);
+    padding: 16px 8px 4px;
+}
+
+nav#sidebar a {
+    display: block;
+    padding: 3px 8px;
+    color: var(--text);
+    text-decoration: none;
+    font-size: 13px;
+    border-radius: 3px;
+}
+
+nav#sidebar a:hover { background: var(--border); }
+nav#sidebar a.active { background: #dbe8f6; color: var(--link); font-weight: 600; }
+
+/* Main */
+main {
+    flex: 1;
+    min-width: 0;
+    padding: 24px 0 80px 32px;
+}
+
+/* Index page */
+.index-header {
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+}
+
+.index-header h1 { font-size: 22px; font-weight: 700; }
+.index-header p { color: var(--text-aside); margin-top: 4px; font-size: 13px; }
+
+.class-index-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+.class-index-table th {
+    text-align: left;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--text-aside);
+    padding: 4px 8px;
+    border-bottom: 1px solid var(--border);
+}
+
+.class-index-table td {
+    padding: 6px 8px;
+    border-bottom: 1px solid #f0f0f0;
+    vertical-align: top;
+}
+
+.class-index-table tr:last-child td { border-bottom: none; }
+.class-index-table .class-link { font-weight: 600; color: var(--link); text-decoration: none; }
+.class-index-table .class-link:hover { text-decoration: underline; }
+.class-index-table .extends-col { color: var(--text-aside); font-family: monospace; font-size: 12px; }
+.class-index-table .doc-col { color: var(--text-aside); }
+
+/* Class page */
+.page-title {
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+}
+
+.page-title h1 {
+    font-size: 22px;
+    font-weight: 700;
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.page-title .file-tag {
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--text-aside);
+    font-family: monospace;
+}
+
+.page-title .extends-line {
+    font-size: 13px;
+    color: var(--text-aside);
+    margin-top: 4px;
+    font-family: monospace;
+}
+
+.page-title .extends-line .ext-name { color: var(--link); }
+
+.page-doc { font-size: 14px; margin-top: 12px; }
+
+/* Index panel */
+.index-panel {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    margin-bottom: 24px;
+    overflow: hidden;
+}
+
+.index-panel summary {
+    padding: 10px 14px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 13px;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    user-select: none;
+}
+
+.index-panel summary::-webkit-details-marker { display: none; }
+.index-panel summary::before { content: "▸"; font-size: 10px; color: var(--text-aside); }
+details[open] .index-panel summary::before { content: "▾"; }
+details[open] .index-panel summary { border-bottom: 1px solid var(--border); }
+
+.index-panel .index-body {
+    padding: 10px 14px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 2px 16px;
+}
+
+.index-panel .index-section-label {
+    grid-column: 1 / -1;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--text-aside);
+    padding: 8px 0 2px;
+}
+
+.index-panel a {
+    font-size: 13px;
+    color: var(--link);
+    text-decoration: none;
+    padding: 1px 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.index-panel a:hover { text-decoration: underline; }
+
+/* Sections */
+.section {
+    margin-top: 32px;
+}
+
+.section > h2 {
+    font-size: 16px;
+    font-weight: 700;
+    margin-bottom: 12px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+}
+
+/* Member table (vars, consts, signals) */
+.member-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.member-table th {
+    text-align: left;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--text-aside);
+    padding: 6px 12px;
+    background: var(--sig-bg);
+    border-bottom: 1px solid var(--border);
+    font-weight: 600;
+}
+
+.member-table td {
+    padding: 8px 12px;
+    border-bottom: 1px solid #f0f0f0;
+    vertical-align: top;
+}
+
+.member-table tr:last-child td { border-bottom: none; }
+.member-table .name-col { font-family: monospace; font-weight: 600; }
+.member-table .name-col a { color: var(--text); text-decoration: none; }
+.member-table .type-col { font-family: monospace; color: var(--type); white-space: nowrap; }
+.member-table .default-col { font-family: monospace; color: var(--text-aside); font-size: 12px; }
+.member-table .doc-col { color: var(--text-aside); }
+
+/* Function entry */
+.fn-entry {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    margin-bottom: 12px;
+    overflow: hidden;
+}
+
+.fn-entry .fn-sig {
+    padding: 10px 14px;
+    background: var(--sig-bg);
+    border-bottom: 1px solid var(--border);
+    font-family: monospace;
+    font-size: 13px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0;
+}
+
+.fn-sig .kw   { color: var(--kw); font-weight: 700; margin-right: 5px; }
+.fn-sig .fn   { color: var(--fn); font-weight: 700; }
+.fn-sig .paren{ color: var(--text-aside); }
+.fn-sig .pn   { color: var(--param); }
+.fn-sig .pt   { color: var(--type); }
+.fn-sig .pd   { color: var(--text-aside); }
+.fn-sig .ret  { color: var(--type); }
+.fn-sig .sep  { color: var(--text-aside); margin: 0 2px; }
+
+.fn-entry .fn-body {
+    padding: 12px 14px;
+}
+
+.fn-body .fn-doc { font-size: 13px; color: var(--text); margin-bottom: 10px; }
+.fn-body .fn-doc p { margin-bottom: 4px; }
+
+.fn-body .param-list {
+    font-size: 12px;
+    border-top: 1px solid #f0f0f0;
+    padding-top: 8px;
+    margin-top: 4px;
+}
+
+.fn-body .param-list table {
+    border-collapse: collapse;
+    width: 100%;
+}
+
+.fn-body .param-list th {
+    text-align: left;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--text-aside);
+    padding: 2px 8px 2px 0;
+    font-weight: 600;
+}
+
+.fn-body .param-list td {
+    padding: 2px 8px 2px 0;
+    vertical-align: top;
+}
+
+.fn-body .param-list .p-name { font-family: monospace; font-weight: 700; color: var(--param); }
+.fn-body .param-list .p-type { font-family: monospace; color: var(--type); }
+.fn-body .param-list .p-default { font-family: monospace; color: var(--text-aside); }
+.fn-body .param-list .p-desc { color: var(--text-aside); }
+
+/* Enum */
+.enum-entry {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    margin-bottom: 12px;
+    overflow: hidden;
+}
+
+.enum-entry .enum-sig {
+    padding: 10px 14px;
+    background: var(--sig-bg);
+    border-bottom: 1px solid var(--border);
+    font-family: monospace;
+    font-size: 13px;
+}
+
+.enum-entry .enum-sig .kw { color: var(--kw); font-weight: 700; margin-right: 5px; }
+.enum-entry .enum-body { padding: 10px 14px; }
+.enum-entry .enum-doc { font-size: 13px; color: var(--text-aside); margin-bottom: 8px; }
+
+.enum-val-table { font-family: monospace; font-size: 12px; border-collapse: collapse; }
+.enum-val-table td { padding: 1px 12px 1px 0; }
+.enum-val-table .v-name { font-weight: 700; }
+.enum-val-table .v-val  { color: var(--text-aside); }
+
+/* Tags */
+.tag {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 1px 5px;
+    border-radius: 3px;
+    margin-left: 6px;
+    vertical-align: middle;
+}
+.tag-dep { background: #fee2e2; color: #991b1b; }
+.tag-exp { background: #fef3c7; color: #92400e; }
+
+/* Misc */
+code { font-family: monospace; background: #eef0f4; padding: 1px 4px; border-radius: 3px; font-size: .9em; }
+.sig-param { font-family: monospace; color: var(--param); }
+pre { background: #1e1e2e; color: #cdd6f4; padding: 12px 14px; border-radius: 4px; overflow-x: auto; font-size: 12px; }
+pre code { background: none; padding: 0; color: inherit; }
+p { margin-bottom: .5em; }
+p:last-child { margin-bottom: 0; }
+a { color: var(--link); }
+
+@media (max-width: 720px) {
+    .layout { padding: 0 8px; }
+    nav#sidebar { display: none; }
+    main { padding: 16px 0 40px; }
+}
+</style>
+</head>
+<body>
+<header>
+  <a class="title" href="index.html">qti-neon</a>
+  <span class="sep" style="color:#ccc">|</span>
+  <nav class="breadcrumb"><a href="index.html">qti-neon</a> <span class="sep">/</span> NeonHost</nav>
+</header>
+<div class="layout">
+  <nav id="sidebar">
+    <a href="index.html">Overview</a>
+    <div class="nav-section">Classes</div>
+<a href="BatchAckManager.html">BatchAckManager</a>
+<a href="DtlsConfig.html">DtlsConfig</a>
+<a href="GamePacketRegistry.html">GamePacketRegistry</a>
+<a href="NeonClient.html">NeonClient</a>
+<a href="NeonConfig.html">NeonConfig</a>
+<a href="NeonHost.html" class="active">NeonHost</a>
+<a href="NeonRelay.html">NeonRelay</a>
+<a href="ReliablePacketManager.html">ReliablePacketManager</a>
+<a href="neon_client_runner.html">neon_client_runner</a>
+<a href="neon_host_runner.html">neon_host_runner</a>
+<a href="plugin.html">plugin</a>
+  </nav>
+  <main>
+<div class="page-title">
+  <h1>NeonHost <span class="file-tag">NeonHost.gd</span></h1>
+  <div class="extends-line">extends <span class="ext-name">RefCounted</span></div>
+  <div class="page-doc"><p>Manages a game session as the host, connected through a <a href="NeonRelay.html">NeonRelay</a>.</p>
+<p>Create a <a href="NeonHost.html">NeonHost</a>, register callbacks, then call <a href="#fn-start_and_run">start_and_run</a> (blocking) or <a href="#fn-start">start</a> followed by a manual loop calling <a href="#fn-process_packets">process_packets</a>. The host handles client connection, reconnection, session config delivery, and ACK tracking.</p></div>
+</div>
+
+<details open>
+  <div class="index-panel">
+    <summary>Index</summary>
+    <div class="index-body">
+      <div class="index-section-label">Constants</div><a href="#const-_Proto">_Proto</a><a href="#const-_SockMod">_SockMod</a><a href="#const-_AckMod">_AckMod</a><div class="index-section-label">Properties</div><a href="#var-_session_id">_session_id</a><a href="#var-_relay_address">_relay_address</a><a href="#var-_config">_config</a><a href="#var-_socket">_socket</a><a href="#var-_running">_running</a><a href="#var-_sequence">_sequence</a><a href="#var-_next_client_id">_next_client_id</a><a href="#var-_mutex">_mutex</a><a href="#var-_connected_clients">_connected_clients</a><a href="#var-_disconnected_clients">_disconnected_clients</a><a href="#var-_connected_names">_connected_names</a><a href="#var-_seq_to_client">_seq_to_client</a><a href="#var-_crypto">_crypto</a><a href="#var-client_connect_callback">client_connect_callback</a><a href="#var-client_disconnect_callback">client_disconnect_callback</a><a href="#var-unhandled_packet_callback">unhandled_packet_callback</a><a href="#var-packet_registry">packet_registry</a><a href="#var-colon">colon</a><a href="#var-relay_host">relay_host</a><a href="#var-relay_port">relay_port</a><a href="#var-err">err</a><a href="#var-host_token">host_token</a><a href="#var-reg_payload">reg_payload</a><a href="#var-reg_pkt">reg_pkt</a><a href="#var-deadline">deadline</a><a href="#var-data">data</a><a href="#var-hdr">hdr</a><a href="#var-pl">pl</a><a href="#var-deadline">deadline</a><a href="#var-all_clear">all_clear</a><a href="#var-ack">ack</a><a href="#var-data">data</a><a href="#var-client_ids">client_ids</a><a href="#var-ack">ack</a><a href="#var-failed">failed</a><a href="#var-hdr">hdr</a><a href="#var-payload">payload</a><a href="#var-sender">sender</a><a href="#var-p">p</a><a href="#var-name">name</a><a href="#var-already">already</a><a href="#var-cid">cid</a><a href="#var-token">token</a><a href="#var-ack">ack</a><a href="#var-accept_payload">accept_payload</a><a href="#var-accept_pkt">accept_pkt</a><a href="#var-seq">seq</a><a href="#var-sc_payload">sc_payload</a><a href="#var-sc_pkt">sc_pkt</a><a href="#var-reg_payload">reg_payload</a><a href="#var-reg_pkt">reg_pkt</a><a href="#var-p">p</a><a href="#var-token">token</a><a href="#var-cid">cid</a><a href="#var-dc">dc</a><a href="#var-name">name</a><a href="#var-new_token">new_token</a><a href="#var-ack">ack</a><a href="#var-accept_payload">accept_payload</a><a href="#var-accept_pkt">accept_pkt</a><a href="#var-seq">seq</a><a href="#var-sc_payload">sc_payload</a><a href="#var-sc_pkt">sc_pkt</a><a href="#var-reg_payload">reg_payload</a><a href="#var-reg_pkt">reg_pkt</a><a href="#var-info">info</a><a href="#var-name">name</a><a href="#var-p">p</a><a href="#var-cid">cid</a><a href="#var-p">p</a><a href="#var-pong_payload">pong_payload</a><a href="#var-pkt">pkt</a><a href="#var-pkt">pkt</a><a href="#var-deny_payload">deny_payload</a><a href="#var-pkt">pkt</a><a href="#var-pkt">pkt</a><a href="#var-s">s</a><a href="#var-bytes">bytes</a><a href="#var-now">now</a><a href="#var-expired">expired</a><a href="#var-e">e</a><div class="index-section-label">Methods</div><a href="#fn-_init">_init</a><a href="#fn-set_client_connect_callback">set_client_connect_callback</a><a href="#fn-set_client_disconnect_callback">set_client_disconnect_callback</a><a href="#fn-set_unhandled_packet_callback">set_unhandled_packet_callback</a><a href="#fn-start_and_run">start_and_run</a><a href="#fn-start">start</a><a href="#fn-stop">stop</a><a href="#fn-is_running">is_running</a><a href="#fn-process_packets">process_packets</a><a href="#fn-send_packet">send_packet</a>
+    </div>
+  </div>
+</details>
+<div class="section"><h2>Constants</h2><table class="member-table"><thead><tr><th>Name</th><th>Value</th><th>Description</th></tr></thead><tbody><tr id="const-_Proto"><td class="name-col">_Proto</td><td class="default-col">preload(&quot;res://addons/qti_neon/_protocol.gd&quot;)</td><td class="doc-col"></td></tr><tr id="const-_SockMod"><td class="name-col">_SockMod</td><td class="default-col">preload(&quot;res://addons/qti_neon/_socket.gd&quot;)</td><td class="doc-col"></td></tr><tr id="const-_AckMod"><td class="name-col">_AckMod</td><td class="default-col">preload(&quot;res://addons/qti_neon/_ack.gd&quot;)</td><td class="doc-col"></td></tr></tbody></table></div>
+<div class="section"><h2>Properties</h2><table class="member-table"><thead><tr><th>Type</th><th>Name</th><th>Default</th><th>Description</th></tr></thead><tbody><tr id="var-_session_id"><td class="type-col"><span class="type-col">int</span></td><td class="name-col">_session_id</td><td class="default-col"></td><td class="doc-col"></td></tr><tr id="var-_relay_address"><td class="type-col"><span class="type-col">String</span></td><td class="name-col">_relay_address</td><td class="default-col"></td><td class="doc-col"></td></tr><tr id="var-_config"><td class="type-col"><span class="type-col">NeonConfig</span></td><td class="name-col">_config</td><td class="default-col"></td><td class="doc-col"></td></tr><tr id="var-_socket"><td class="type-col"><span class="type-col">_SockMod</span></td><td class="name-col">_socket</td><td class="default-col">null</td><td class="doc-col"></td></tr><tr id="var-_running"><td class="type-col"><span class="type-col">bool</span></td><td class="name-col">_running</td><td class="default-col">false</td><td class="doc-col"></td></tr><tr id="var-_sequence"><td class="type-col"><span class="type-col">int</span></td><td class="name-col">_sequence</td><td class="default-col">0</td><td class="doc-col"></td></tr><tr id="var-_next_client_id"><td class="type-col"><span class="type-col">int</span></td><td class="name-col">_next_client_id</td><td class="default-col">2</td><td class="doc-col"></td></tr><tr id="var-_mutex"><td class="type-col"><span class="type-col">Mutex</span></td><td class="name-col">_mutex</td><td class="default-col">Mutex.new()</td><td class="doc-col"></td></tr><tr id="var-_connected_clients"><td class="type-col"><span class="type-col">Dictionary</span></td><td class="name-col">_connected_clients</td><td class="default-col">{}</td><td class="doc-col"></td></tr><tr id="var-_disconnected_clients"><td class="type-col"><span class="type-col">Dictionary</span></td><td class="name-col">_disconnected_clients</td><td class="default-col">{}</td><td class="doc-col"></td></tr><tr id="var-_connected_names"><td class="type-col"><span class="type-col">Dictionary</span></td><td class="name-col">_connected_names</td><td class="default-col">{}</td><td class="doc-col"></td></tr><tr id="var-_seq_to_client"><td class="type-col"><span class="type-col">Dictionary</span></td><td class="name-col">_seq_to_client</td><td class="default-col">{}</td><td class="doc-col"></td></tr><tr id="var-_crypto"><td class="type-col"><span class="type-col">Crypto</span></td><td class="name-col">_crypto</td><td class="default-col">Crypto.new()</td><td class="doc-col"></td></tr><tr id="var-client_connect_callback"><td class="type-col"><span class="type-col">Callable</span></td><td class="name-col">client_connect_callback</td><td class="default-col">Callable()</td><td class="doc-col"><p>Called when a client completes the connection handshake. <code class="sig-param">cid</code> The assigned client ID. <code class="sig-param">name</code> The player name supplied by the client. <code class="sig-param">sid</code> The session ID.</p></td></tr><tr id="var-client_disconnect_callback"><td class="type-col"><span class="type-col">Callable</span></td><td class="name-col">client_disconnect_callback</td><td class="default-col">Callable()</td><td class="doc-col"><p>Called when a client disconnects or times out. <code class="sig-param">cid</code> The client ID. <code class="sig-param">name</code> The player name.</p></td></tr><tr id="var-unhandled_packet_callback"><td class="type-col"><span class="type-col">Callable</span></td><td class="name-col">unhandled_packet_callback</td><td class="default-col">Callable()</td><td class="doc-col"><p>Called for any received game packet not consumed by the host internally. <code class="sig-param">type_byte</code> The packet type byte. <code class="sig-param">sender</code> The client ID of the sender.</p></td></tr><tr id="var-packet_registry"><td class="type-col"><span class="type-col">GamePacketRegistry</span></td><td class="name-col">packet_registry</td><td class="default-col">null</td><td class="doc-col"><p>Optional packet type registry sent to clients when they connect.</p></td></tr><tr id="var-colon"><td class="type-col"><span style="color:#ccc">Variant</span></td><td class="name-col">colon</td><td class="default-col">_relay_address.rfind(&quot;</td><td class="doc-col"></td></tr><tr id="var-relay_host"><td class="type-col"><span style="color:#ccc">Variant</span></td><td class="name-col">relay_host</td><td class="default-col">_relay_address.left(colon)</td><td class="doc-col"></td></tr><tr id="var-relay_port"><td class="type-col"><span style="color:#ccc">Variant</span></td><td class="name-col">relay_port</td><td class="default-col">int(_relay_address.substr(colon + 1))</td><td class="doc-col"></td></tr><tr id="var-err"><td class="type-col"><span style="color:#ccc">Variant</span></td><td class="name-col">err</td><td class="default-col">_socket.open(relay_host, relay_port, _config.dtls_config)</td><td class="doc-col"></td></tr><tr id="var-host_token"><td class="type-col"><span style="color:#ccc">Variant</span></td><td class="name-col">host_token</td><td class="default-col">_random_token()</td><td class="doc-col"></td></tr><tr id="var-reg_payload"><td class="type-col"><span style="color:#ccc">Variant</span></td><td class="name-col">reg_payload</td><td class="default-col">_Proto.build_host_register(_session_id, host_token)</td><td class="doc-col"></td></tr><tr id="var-reg_pkt"><td class="type-col"><span style="color:#ccc">Variant</span></td><td class="name-col">reg_pkt</td><td class="default-col">_Proto.build_packet(</td><td class="doc-col"></td></tr><tr id="var-deadline"><td class="type-col"><span style="color:#ccc">Variant</span></td><td class="name-col">deadline</td><td class="default-col">Time.get_ticks_msec() + _config.client_connection_timeout_ms</td><td class="doc-col"></td></tr><tr id="var-data"><td class="type-col"><span style="color:#ccc">Variant</span></td><td class="name-col">data</td><td class="default-col">_socket.receive()</td><td class="doc-col"></td></tr><tr id="var-hdr"><td class="type-col"><span style="color:#ccc">Variant</span></td><td class="name-col">hdr</td><td class="default-col">_Proto.parse_header(data)</td><td class="doc-col"></td></tr><tr id="var-pl"><td class="type-col"><span style="color:#ccc">Variant</span></td><td class="name-col">pl</td><td class="default-col">_Proto.parse_connect_accept(_Proto.payload_of(data))</td><td class="doc-col"></td></tr><tr id="var-deadline"><td class="type-col"><span style="color:#ccc">Variant</span></td><td class="name-col">deadline</td><td class="default-col">Time.get_ticks_msec() + _config.host_graceful_shutdown_timeout_ms</td><td class="doc-col"></td></tr><tr id="var-all_clear"><td class="type-col"><span style="color:#ccc">Variant</span></td><td class="name-col">all_clear</td><td class="default-col">true</td><td class="doc-col"></td></tr><tr id="var-ack"><td class="type-col"><span class="type-col">_AckMod</span></td><td class="name-col">ack</td><td class="default-col">_connected_clients[cid][&quot;ack&quot;]</td><td class="doc-col"></td></tr><tr id="var-data"><td class="type-col"><span style="color:#ccc">Variant</span></td><td class="name-col">data</td><td class="default-col">_socket.receive()</td><td class="doc-col"></td></tr><tr id="var-client_ids"><td class="type-col"><span style="color:#ccc">Variant</span></td><td class="name-col">client_ids</td><td class="default-col">_connected_clients.keys()</td><td class="doc-col"></td></tr><tr id="var-ack"><td class="type-col"><span class="type-col">_AckMod</span></td><td class="name-col">ack</td><td class="default-col">_connected_clients[cid][&quot;ack&quot;]</td><td class="doc-col"></td></tr><tr id="var-failed"><td class="type-col"><span style="color:#ccc">Variant</span></td><td class="name-col">failed</td><td class="default-col">ack.check(</td><td class="doc-col"></td></tr><tr id="var-hdr"><td class="type-col"><span style="color:#ccc">Variant</span></td><td class="name-col">hdr</td><td class="default-col">_Proto.parse_header(data)</td><td class="doc-col"></td></tr><tr id="var-payload"><td class="type-col"><span style="color:#ccc">Variant</span></td><td class="name-col">payload</td><td class="default-col">_Proto.payload_of(data)</td><td class="doc-col"></td></tr><tr id="var-sender"><td class="type-col"><span class="type-col">int</span></td><td class="name-col">sender</td><td class="default-col">hdr[&quot;client_id&quot;]</td><td class="doc-col"></td></tr><tr id="var-p"><td class="type-col"><span style="color:#ccc">Variant</span></td><td class="name-col">p</td><td class="default-col">_Proto.parse_connect_request(payload)</td><td class="doc-col"></td></tr><tr id="var-name"><td class="type-col"><span class="type-col">String</span></td><td class="name-col">name</td><td class="default-col">p[&quot;name&quot;]</td><td class="doc-col"></td></tr><tr id="var-already"><td class="type-col"><span style="color:#ccc">Variant</span></td><td class="name-col">already</td><td class="default-col">_connected_names.has(name)</td><td class="doc-col"></td></tr><tr id="var-cid"><td class="type-col"><span style="color:#ccc">Variant</span></td><td class="name-col">cid</td><td class="default-col">_next_client_id</td><td class="doc-col"></td></tr><tr id="var-token"><td class="type-col"><span style="color:#ccc">Variant</span></td><td class="name-col">token</td><td class="default-col">_random_token()</td><td class="doc-col"></td></tr><tr id="var-ack"><td class="type-col"><span style="color:#ccc">Variant</span></td><td class="name-col">ack</td><td class="default-col">_AckMod.new()</td><td class="doc-col"></td></tr><tr id="var-accept_payload"><td class="type-col"><span style="color:#ccc">Variant</span></td><td class="name-col">accept_payload</td><td class="default-col">_Proto.build_connect_accept(cid, _session_id, token)</td><td class="doc-col"></td></tr><tr id="var-accept_pkt"><td class="type-col"><span style="color:#ccc">Variant</span></td><td class="name-col">accept_pkt</td><td class="default-col">_Proto.build_packet(</td><td class="doc-col"></td></tr><tr id="var-seq"><td class="type-col"><span style="color:#ccc">Variant</span></td><td class="name-col">seq</td><td class="default-col">_next_seq()</td><td class="doc-col"></td></tr><tr id="var-sc_payload"><td class="type-col"><span style="color:#ccc">Variant</span></td><td class="name-col">sc_payload</td><td class="default-col">_Proto.build_session_config(</td><td class="doc-col"></td></tr><tr id="var-sc_pkt"><td class="type-col"><span style="color:#ccc">Variant</span></td><td class="name-col">sc_pkt</td><td class="default-col">_Proto.build_packet(_Proto.PT_SESSION_CONFIG, seq, 1, cid, sc_payload)</td><td class="doc-col"></td></tr><tr id="var-reg_payload"><td class="type-col"><span style="color:#ccc">Variant</span></td><td class="name-col">reg_payload</td><td class="default-col">_Proto.build_packet_type_registry(packet_registry.to_entry_array())</td><td class="doc-col"></td></tr><tr id="var-reg_pkt"><td class="type-col"><span style="color:#ccc">Variant</span></td><td class="name-col">reg_pkt</td><td class="default-col">_Proto.build_packet(</td><td class="doc-col"></td></tr><tr id="var-p"><td class="type-col"><span style="color:#ccc">Variant</span></td><td class="name-col">p</td><td class="default-col">_Proto.parse_reconnect_request(payload)</td><td class="doc-col"></td></tr><tr id="var-token"><td class="type-col"><span class="type-col">int</span></td><td class="name-col">token</td><td class="default-col">p[&quot;token&quot;]</td><td class="doc-col"></td></tr><tr id="var-cid"><td class="type-col"><span class="type-col">int</span></td><td class="name-col">cid</td><td class="default-col">p[&quot;previous_client_id&quot;]</td><td class="doc-col"></td></tr><tr id="var-dc"><td class="type-col"><span class="type-col">Dictionary</span></td><td class="name-col">dc</td><td class="default-col">_disconnected_clients.get(cid, {})</td><td class="doc-col"></td></tr><tr id="var-name"><td class="type-col"><span class="type-col">String</span></td><td class="name-col">name</td><td class="default-col">dc[&quot;name&quot;]</td><td class="doc-col"></td></tr><tr id="var-new_token"><td class="type-col"><span style="color:#ccc">Variant</span></td><td class="name-col">new_token</td><td class="default-col">_random_token()</td><td class="doc-col"></td></tr><tr id="var-ack"><td class="type-col"><span style="color:#ccc">Variant</span></td><td class="name-col">ack</td><td class="default-col">_AckMod.new()</td><td class="doc-col"></td></tr><tr id="var-accept_payload"><td class="type-col"><span style="color:#ccc">Variant</span></td><td class="name-col">accept_payload</td><td class="default-col">_Proto.build_connect_accept(cid, _session_id, new_token)</td><td class="doc-col"></td></tr><tr id="var-accept_pkt"><td class="type-col"><span style="color:#ccc">Variant</span></td><td class="name-col">accept_pkt</td><td class="default-col">_Proto.build_packet(</td><td class="doc-col"></td></tr><tr id="var-seq"><td class="type-col"><span style="color:#ccc">Variant</span></td><td class="name-col">seq</td><td class="default-col">_next_seq()</td><td class="doc-col"></td></tr><tr id="var-sc_payload"><td class="type-col"><span style="color:#ccc">Variant</span></td><td class="name-col">sc_payload</td><td class="default-col">_Proto.build_session_config(</td><td class="doc-col"></td></tr><tr id="var-sc_pkt"><td class="type-col"><span style="color:#ccc">Variant</span></td><td class="name-col">sc_pkt</td><td class="default-col">_Proto.build_packet(_Proto.PT_SESSION_CONFIG, seq, 1, cid, sc_payload)</td><td class="doc-col"></td></tr><tr id="var-reg_payload"><td class="type-col"><span style="color:#ccc">Variant</span></td><td class="name-col">reg_payload</td><td class="default-col">_Proto.build_packet_type_registry(packet_registry.to_entry_array())</td><td class="doc-col"></td></tr><tr id="var-reg_pkt"><td class="type-col"><span style="color:#ccc">Variant</span></td><td class="name-col">reg_pkt</td><td class="default-col">_Proto.build_packet(</td><td class="doc-col"></td></tr><tr id="var-info"><td class="type-col"><span class="type-col">Dictionary</span></td><td class="name-col">info</td><td class="default-col">_connected_clients.get(sender, {})</td><td class="doc-col"></td></tr><tr id="var-name"><td class="type-col"><span class="type-col">String</span></td><td class="name-col">name</td><td class="default-col">info[&quot;name&quot;]</td><td class="doc-col"></td></tr><tr id="var-p"><td class="type-col"><span style="color:#ccc">Variant</span></td><td class="name-col">p</td><td class="default-col">_Proto.parse_ack(payload)</td><td class="doc-col"></td></tr><tr id="var-cid"><td class="type-col"><span class="type-col">int</span></td><td class="name-col">cid</td><td class="default-col">_seq_to_client.get(seq, -1)</td><td class="doc-col"></td></tr><tr id="var-p"><td class="type-col"><span style="color:#ccc">Variant</span></td><td class="name-col">p</td><td class="default-col">_Proto.parse_ping(payload)</td><td class="doc-col"></td></tr><tr id="var-pong_payload"><td class="type-col"><span style="color:#ccc">Variant</span></td><td class="name-col">pong_payload</td><td class="default-col">_Proto.build_pong(p[&quot;timestamp&quot;])</td><td class="doc-col"></td></tr><tr id="var-pkt"><td class="type-col"><span style="color:#ccc">Variant</span></td><td class="name-col">pkt</td><td class="default-col">_Proto.build_packet(</td><td class="doc-col"></td></tr><tr id="var-pkt"><td class="type-col"><span style="color:#ccc">Variant</span></td><td class="name-col">pkt</td><td class="default-col">_Proto.build_packet(type_byte, _next_seq(), 1, dest, data)</td><td class="doc-col"></td></tr><tr id="var-deny_payload"><td class="type-col"><span style="color:#ccc">Variant</span></td><td class="name-col">deny_payload</td><td class="default-col">_Proto.build_connect_deny(reason)</td><td class="doc-col"></td></tr><tr id="var-pkt"><td class="type-col"><span style="color:#ccc">Variant</span></td><td class="name-col">pkt</td><td class="default-col">_Proto.build_packet(</td><td class="doc-col"></td></tr><tr id="var-pkt"><td class="type-col"><span style="color:#ccc">Variant</span></td><td class="name-col">pkt</td><td class="default-col">_Proto.build_packet(</td><td class="doc-col"></td></tr><tr id="var-s"><td class="type-col"><span style="color:#ccc">Variant</span></td><td class="name-col">s</td><td class="default-col">_sequence</td><td class="doc-col"></td></tr><tr id="var-bytes"><td class="type-col"><span style="color:#ccc">Variant</span></td><td class="name-col">bytes</td><td class="default-col">_crypto.generate_random_bytes(8)</td><td class="doc-col"></td></tr><tr id="var-now"><td class="type-col"><span style="color:#ccc">Variant</span></td><td class="name-col">now</td><td class="default-col">Time.get_ticks_msec()</td><td class="doc-col"></td></tr><tr id="var-expired"><td class="type-col"><span class="type-col">Array</span></td><td class="name-col">expired</td><td class="default-col">[]</td><td class="doc-col"></td></tr><tr id="var-e"><td class="type-col"><span class="type-col">Dictionary</span></td><td class="name-col">e</td><td class="default-col">_disconnected_clients[cid]</td><td class="doc-col"></td></tr></tbody></table></div>
+<div class="section"><h2>Methods</h2>
+<div class="fn-entry" id="fn-_init"><div class="fn-sig"><span class="kw">func</span><span class="fn">_init</span><span class="paren">(</span><span class="pn">session_id</span><span class="sep">:</span><span class="pt">int</span><span class="sep">, </span><span class="pn">relay_address</span><span class="sep">:</span><span class="pt">String</span><span class="sep">, </span><span class="pn">config</span><span class="sep">:</span><span class="pt">NeonConfig</span><span class="sep">=</span><span class="pd">null</span><span class="paren">)</span></div><div class="fn-body"><div class="fn-doc"><p>Creates a new host for the given session. <code class="sig-param">session_id</code> Identifies this session on the relay. <code class="sig-param">relay_address</code> The relay address in <code>host:port</code> format. <code class="sig-param">config</code> Optional configuration; defaults are used if <code>null</code>.</p></div><div class="param-list"><table><thead><tr><th>Parameter</th><th>Type</th><th>Default</th><th>Description</th></tr></thead><tbody><tr><td class="p-name">session_id</td><td class="p-type">int</td><td class="p-default"></td><td class="p-desc">Identifies this session on the relay.</td></tr><tr><td class="p-name">relay_address</td><td class="p-type">String</td><td class="p-default"></td><td class="p-desc">The relay address in</td></tr><tr><td class="p-name">config</td><td class="p-type">NeonConfig</td><td class="p-default">null</td><td class="p-desc">Optional configuration; defaults are used if</td></tr></tbody></table></div></div></div>
+<div class="fn-entry" id="fn-set_client_connect_callback"><div class="fn-sig"><span class="kw">func</span><span class="fn">set_client_connect_callback</span><span class="paren">(</span><span class="pn">cb</span><span class="sep">:</span><span class="pt">Callable</span><span class="paren">)</span></div><div class="fn-body"><div class="fn-doc"><p>Sets the callback invoked when a client connects. <code class="sig-param">cb</code> A <code>Callable</code> taking <code>(cid: int, name: String, sid: int)</code>.</p></div><div class="param-list"><table><thead><tr><th>Parameter</th><th>Type</th><th>Default</th><th>Description</th></tr></thead><tbody><tr><td class="p-name">cb</td><td class="p-type">Callable</td><td class="p-default"></td><td class="p-desc">A</td></tr></tbody></table></div></div></div>
+<div class="fn-entry" id="fn-set_client_disconnect_callback"><div class="fn-sig"><span class="kw">func</span><span class="fn">set_client_disconnect_callback</span><span class="paren">(</span><span class="pn">cb</span><span class="sep">:</span><span class="pt">Callable</span><span class="paren">)</span></div><div class="fn-body"><div class="fn-doc"><p>Sets the callback invoked when a client disconnects. <code class="sig-param">cb</code> A <code>Callable</code> taking <code>(cid: int, name: String)</code>.</p></div><div class="param-list"><table><thead><tr><th>Parameter</th><th>Type</th><th>Default</th><th>Description</th></tr></thead><tbody><tr><td class="p-name">cb</td><td class="p-type">Callable</td><td class="p-default"></td><td class="p-desc">A</td></tr></tbody></table></div></div></div>
+<div class="fn-entry" id="fn-set_unhandled_packet_callback"><div class="fn-sig"><span class="kw">func</span><span class="fn">set_unhandled_packet_callback</span><span class="paren">(</span><span class="pn">cb</span><span class="sep">:</span><span class="pt">Callable</span><span class="paren">)</span></div><div class="fn-body"><div class="fn-doc"><p>Sets the callback invoked for unhandled game packets. <code class="sig-param">cb</code> A <code>Callable</code> taking <code class="sig-param">type_byte</code> and <code class="sig-param">sender</code> as integers.</p></div><div class="param-list"><table><thead><tr><th>Parameter</th><th>Type</th><th>Default</th><th>Description</th></tr></thead><tbody><tr><td class="p-name">cb</td><td class="p-type">Callable</td><td class="p-default"></td><td class="p-desc">A</td></tr></tbody></table></div></div></div>
+<div class="fn-entry" id="fn-start_and_run"><div class="fn-sig"><span class="kw">func</span><span class="fn">start_and_run</span><span class="paren">(</span><span class="paren">)</span></div><div class="fn-body"><div class="fn-doc"><p>Starts the host and blocks in the processing loop until <a href="#fn-stop">stop</a> is called.</p>
+<p>Equivalent to calling <a href="#fn-start">start</a> then looping <a href="#fn-process_packets">process_packets</a>. Run on a dedicated thread.</p></div></div></div>
+<div class="fn-entry" id="fn-start"><div class="fn-sig"><span class="kw">func</span><span class="fn">start</span><span class="paren">(</span><span class="paren">)</span><span class="sep"> -&gt; </span><span class="ret">bool</span></div><div class="fn-body"><div class="fn-doc"><p>Connects to the relay and registers this session without blocking.</p>
+<p>Returns <code>true</code> on success. After this returns, call <a href="#fn-process_packets">process_packets</a> in a loop to handle incoming connections.</p></div></div></div>
+<div class="fn-entry" id="fn-stop"><div class="fn-sig"><span class="kw">func</span><span class="fn">stop</span><span class="paren">(</span><span class="paren">)</span></div><div class="fn-body"><div class="fn-doc"><p>Gracefully shuts down the host.</p>
+<p>Waits up to <code>NeonConfig.host_graceful_shutdown_timeout_ms</code> for pending ACKs, then sends a disconnect notice to all clients and closes the socket.</p></div></div></div>
+<div class="fn-entry" id="fn-is_running"><div class="fn-sig"><span class="kw">func</span><span class="fn">is_running</span><span class="paren">(</span><span class="paren">)</span><span class="sep"> -&gt; </span><span class="ret">bool</span></div><div class="fn-body"><div class="fn-doc"><p>Returns <code>true</code> if the host is connected and processing.</p></div></div></div>
+<div class="fn-entry" id="fn-process_packets"><div class="fn-sig"><span class="kw">func</span><span class="fn">process_packets</span><span class="paren">(</span><span class="paren">)</span></div><div class="fn-body"><div class="fn-doc"><p>Drains all pending packets from the socket without blocking.</p>
+<p>Called automatically by <a href="#fn-start_and_run">start_and_run</a>. Can be called manually if you manage the loop yourself.</p></div></div></div>
+<div class="fn-entry" id="fn-send_packet"><div class="fn-sig"><span class="kw">func</span><span class="fn">send_packet</span><span class="paren">(</span><span class="pn">data</span><span class="sep">:</span><span class="pt">PackedByteArray</span><span class="sep">, </span><span class="pn">type_byte</span><span class="sep">:</span><span class="pt">int</span><span class="sep">, </span><span class="pn">dest</span><span class="sep">:</span><span class="pt">int</span><span class="paren">)</span></div><div class="fn-body"><div class="fn-doc"><p>Sends a game packet through the relay.</p>
+<p><code class="sig-param">data</code> The raw packet payload. <code class="sig-param">type_byte</code> The game packet type byte (must be &gt;= 0x10). <code class="sig-param">dest</code> The destination client ID, or <code>0</code> to broadcast to all clients.</p></div><div class="param-list"><table><thead><tr><th>Parameter</th><th>Type</th><th>Default</th><th>Description</th></tr></thead><tbody><tr><td class="p-name">data</td><td class="p-type">PackedByteArray</td><td class="p-default"></td><td class="p-desc">The raw packet payload.</td></tr><tr><td class="p-name">type_byte</td><td class="p-type">int</td><td class="p-default"></td><td class="p-desc">The game packet type byte (must be &gt;= 0x10).</td></tr><tr><td class="p-name">dest</td><td class="p-type">int</td><td class="p-default"></td><td class="p-desc">The destination client ID, or</td></tr></tbody></table></div></div></div>
+</div></main>
+</div>
+</body>
+</html>

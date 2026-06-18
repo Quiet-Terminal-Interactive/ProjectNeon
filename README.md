@@ -78,6 +78,17 @@ await relay.start();
 
 </details>
 
+<details>
+<summary>Godot</summary>
+
+```gdscript
+var relay := NeonRelay.new("0.0.0.0")  # relay port 7777
+var thread := Thread.new()
+thread.start(relay.start_and_run)
+```
+
+</details>
+
 ### 2. Start a host
 
 <details>
@@ -119,6 +130,19 @@ const host = new NeonHost(42, 'relay.example.com:7777');
 host.setClientConnectCallback((id, name, sid) => onClientJoin(id, name));
 host.setUnhandledPacketCallback((type, from) => handleGamePacket(type, from));
 await host.start();
+```
+
+</details>
+
+<details>
+<summary>Godot</summary>
+
+```gdscript
+var host := NeonHost.new(42, "relay.example.com:7777")
+host.set_client_connect_callback(func(id, name, sid): on_client_join(id, name))
+host.set_unhandled_packet_callback(func(type, from): handle_game_packet(type, from))
+var thread := Thread.new()
+thread.start(host.start_and_run)
 ```
 
 </details>
@@ -174,6 +198,20 @@ await client.connect(42, 'relay.example.com:7777');
 
 </details>
 
+<details>
+<summary>Godot</summary>
+
+```gdscript
+var client := NeonClient.new("player1")
+client.set_unhandled_packet_callback(func(type, from): handle_game_packet(type, from))
+
+if client.connect(42, "relay.example.com:7777"):
+    var thread := Thread.new()
+    thread.start(client.run)
+```
+
+</details>
+
 ### 4. Send a packet
 
 <details>
@@ -202,6 +240,16 @@ client.send_packet(data, PACKET_POSITION, dest_id=0)  # 0 = broadcast
 ```typescript
 const data = encodePosition(x, y, z);
 client.sendPacket(data, PACKET_POSITION, 0); // 0 = broadcast
+```
+
+</details>
+
+<details>
+<summary>Godot</summary>
+
+```gdscript
+var data := encode_position(x, y, z)
+client.send_packet(data, PACKET_POSITION, 0)  # 0 = broadcast
 ```
 
 </details>
@@ -237,6 +285,17 @@ ok = client.reconnect()  # uses stored session token
 client.stop(); // or socket dies ungracefully
 // ...
 const ok = await client.reconnect(); // uses stored session token
+```
+
+</details>
+
+<details>
+<summary>Godot</summary>
+
+```gdscript
+client.stop()  # or socket dies ungracefully
+# ...
+var ok := client.reconnect()  # uses stored session token
 ```
 
 </details>
@@ -303,7 +362,22 @@ const client = new NeonClient('player1', clientCfg);
 
 </details>
 
-`insecureTrustAll()` is for development and testing only — it accepts any certificate.
+<details>
+<summary>Godot</summary>
+
+```gdscript
+# Relay — load certificate and private key (PEM files)
+var relay_cfg := NeonConfig.new({dtls_config = DtlsConfig.from_key_store("relay.crt", "relay.key")})
+var relay := NeonRelay.new("0.0.0.0", relay_cfg)
+
+# Host / Client — trust the relay certificate (or use insecure for dev)
+var client_cfg := NeonConfig.new({dtls_config = DtlsConfig.insecure_trust_all()})  # dev only
+var client := NeonClient.new("player1", client_cfg)
+```
+
+</details>
+
+`insecure_trust_all()` / `insecureTrustAll()` is for development and testing only — it accepts any certificate.
 For production, supply a trust manager that pins the relay's certificate.
 
 When DTLS is not configured (the default), packets are sent in plaintext.
@@ -350,6 +424,15 @@ With DTLS support:
 ```bash
 npm install koffi
 ```
+
+</details>
+
+<details>
+<summary>Godot (Asset Library / manual)</summary>
+
+Copy (or symlink) `godot/addons/qti_neon/` into your project's `addons/` directory, then enable the plugin in **Project → Project Settings → Plugins**.
+
+No package manager step is required — the implementation is pure GDScript with no external dependencies.
 
 </details>
 
@@ -409,6 +492,24 @@ Generate docs:
 ```bash
 npm run docs
 # output: ../docs/ts/index.html
+```
+
+</details>
+
+<details>
+<summary>Godot</summary>
+
+No build step — the implementation is pure GDScript. To verify the compliance scripts parse correctly:
+
+```bash
+cd godot
+godot --headless --check-only --script compliance/neon_host_runner.gd
+```
+
+To run the cross-language compliance tests (requires Java and Node.js):
+
+```bash
+python3 test_compliance.py
 ```
 
 </details>
